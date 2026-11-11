@@ -1,0 +1,470 @@
+<Window x:Class="Taskflare.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:m="clr-namespace:Taskflare.Models"
+        xmlns:v="clr-namespace:Taskflare.Views"
+        Title="Taskflare" Width="1100" Height="720" MinWidth="680" MinHeight="460"
+        Style="{StaticResource AppWindow}" Icon="Assets/taskflare.ico">
+
+    <Window.Resources>
+        <!-- ===== Task row ===== -->
+        <DataTemplate DataType="{x:Type m:TaskItem}">
+            <Grid x:Name="row" MinHeight="54" Background="Transparent" Margin="6,0,4,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="32"/>
+                    <ColumnDefinition Width="24"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <CheckBox Style="{StaticResource TaskCheck}" IsChecked="{Binding Completed, Mode=OneWay}" Click="TaskCheck_Click"
+                          VerticalAlignment="Center" HorizontalAlignment="Center" ToolTip="Mark as completed"/>
+                <ToggleButton x:Name="star" Grid.Column="1" Style="{StaticResource StarToggle}" IsChecked="{Binding Important, Mode=OneWay}"
+                              Click="Star_Click" VerticalAlignment="Center" Opacity="0"/>
+                <StackPanel Grid.Column="2" VerticalAlignment="Center" Margin="4,8,10,8">
+                    <DockPanel LastChildFill="False">
+                        <TextBlock x:Name="title" Text="{Binding Title}" FontSize="14.5" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"
+                                   Foreground="{DynamicResource Text}" VerticalAlignment="Center" MaxWidth="900"/>
+                        <Border x:Name="prio" Style="{StaticResource Pill}" Visibility="{Binding HasPriority, Converter={StaticResource BoolVis}}"
+                                Background="{DynamicResource LowPillBg}">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock x:Name="prioIcon" Style="{StaticResource Icon}" FontSize="10" Text="&#xE7C1;" Margin="0,1,4,0"
+                                           Foreground="{DynamicResource LowPillText}"/>
+                                <TextBlock x:Name="prioText" Text="{Binding PriorityText}" FontSize="11" FontWeight="SemiBold"
+                                           Foreground="{DynamicResource LowPillText}"/>
+                            </StackPanel>
+                        </Border>
+                        <Border Style="{StaticResource Pill}" Background="{DynamicResource MuseSoft}" Visibility="{Binding FromMuse, Converter={StaticResource BoolVis}}"
+                                ToolTip="Added by Muse">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Style="{StaticResource Icon}" FontSize="10" Text="&#xE945;" Margin="0,1,4,0" Foreground="{DynamicResource MuseBadge}"/>
+                                <TextBlock Text="Muse" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource MuseBadge}"/>
+                            </StackPanel>
+                        </Border>
+                    </DockPanel>
+                    <WrapPanel x:Name="meta" Margin="0,3,0,0">
+                        <StackPanel Orientation="Horizontal" Visibility="{Binding InMyDay, Converter={StaticResource BoolVis}}" Margin="0,0,10,0"
+                                    x:Name="myDayMeta">
+                            <TextBlock Style="{StaticResource MetaIcon}" Text="&#xE706;"/>
+                            <TextBlock Style="{StaticResource Meta}" Text="My Day"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Visibility="{Binding HasDue, Converter={StaticResource BoolVis}}">
+                            <TextBlock x:Name="dueIcon" Style="{StaticResource MetaIcon}" Text="&#xE787;"/>
+                            <TextBlock x:Name="dueText" Style="{StaticResource Meta}" Text="{Binding DueText}"/>
+                        </StackPanel>
+                        <TextBlock x:Name="dot" Style="{StaticResource Meta}" Text="  ·  " Visibility="Collapsed"/>
+                        <StackPanel Orientation="Horizontal" Visibility="{Binding ShowList, Converter={StaticResource BoolVis}}">
+                            <Ellipse Width="7" Height="7" Margin="0,1,5,0" VerticalAlignment="Center" x:Name="listDot"
+                                     Fill="{Binding ListColor, Converter={StaticResource HexBrush}}" Visibility="Collapsed"/>
+                            <TextBlock Style="{StaticResource Meta}" Text="{Binding ListName}"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Margin="12,0,0,0" Visibility="{Binding HasSteps, Converter={StaticResource BoolVis}}">
+                            <TextBlock Style="{StaticResource MetaIcon}" Text="&#xE73A;"/>
+                            <TextBlock Style="{StaticResource Meta}" Text="{Binding StepsText}"/>
+                        </StackPanel>
+                        <TextBlock Style="{StaticResource MetaIcon}" Text="&#xEA8F;" Margin="12,1,0,0" ToolTip="{Binding ReminderText}"
+                                   Visibility="{Binding HasReminder, Converter={StaticResource BoolVis}}"/>
+                        <TextBlock Style="{StaticResource MetaIcon}" Text="&#xE8EE;" Margin="12,1,0,0" ToolTip="{Binding RepeatText}"
+                                   Visibility="{Binding HasRepeat, Converter={StaticResource BoolVis}}"/>
+                        <TextBlock Style="{StaticResource MetaIcon}" Text="&#xE70B;" Margin="12,1,0,0" ToolTip="Has a note"
+                                   Visibility="{Binding HasNotes, Converter={StaticResource BoolVis}}"/>
+                        <TextBlock Style="{StaticResource Meta}" Text="{Binding LabelsText}" Margin="12,0,0,0" Foreground="{DynamicResource Accent}"
+                                   Visibility="{Binding HasLabels, Converter={StaticResource BoolVis}}"/>
+                    </WrapPanel>
+                </StackPanel>
+            </Grid>
+            <DataTemplate.Triggers>
+                <DataTrigger Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" Value="True">
+                    <Setter TargetName="star" Property="Opacity" Value="1"/>
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Important}" Value="True">
+                    <Setter TargetName="star" Property="Opacity" Value="1"/>
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Completed}" Value="True">
+                    <Setter TargetName="title" Property="TextDecorations" Value="Strikethrough"/>
+                    <Setter TargetName="title" Property="Foreground" Value="{DynamicResource TextDim}"/>
+                    <Setter TargetName="title" Property="FontWeight" Value="Normal"/>
+                    <Setter TargetName="meta" Property="Opacity" Value="0.6"/>
+                    <Setter TargetName="prio" Property="Opacity" Value="0.5"/>
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Priority}" Value="High">
+                    <Setter TargetName="prio" Property="Background" Value="{DynamicResource HighPillBg}"/>
+                    <Setter TargetName="prioIcon" Property="Foreground" Value="{DynamicResource HighPillText}"/>
+                    <Setter TargetName="prioText" Property="Foreground" Value="{DynamicResource HighPillText}"/>
+                    <Setter TargetName="prioIcon" Property="Text" Value="&#xE718;"/>
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Priority}" Value="Medium">
+                    <Setter TargetName="prio" Property="Background" Value="{DynamicResource MediumPillBg}"/>
+                    <Setter TargetName="prioIcon" Property="Foreground" Value="{DynamicResource MediumPillText}"/>
+                    <Setter TargetName="prioText" Property="Foreground" Value="{DynamicResource MediumPillText}"/>
+                </DataTrigger>
+                <DataTrigger Binding="{Binding HasDueTime}" Value="True">
+                    <Setter TargetName="dueIcon" Property="Text" Value="&#xE823;"/>
+                </DataTrigger>
+                <DataTrigger Binding="{Binding IsOverdue}" Value="True">
+                    <Setter TargetName="dueIcon" Property="Foreground" Value="{DynamicResource Overdue}"/>
+                    <Setter TargetName="dueText" Property="Foreground" Value="{DynamicResource Overdue}"/>
+                </DataTrigger>
+                <MultiDataTrigger>
+                    <MultiDataTrigger.Conditions>
+                        <Condition Binding="{Binding HasDue}" Value="True"/>
+                        <Condition Binding="{Binding ShowList}" Value="True"/>
+                    </MultiDataTrigger.Conditions>
+                    <Setter TargetName="dot" Property="Visibility" Value="Visible"/>
+                </MultiDataTrigger>
+                <MultiDataTrigger>
+                    <MultiDataTrigger.Conditions>
+                        <Condition Binding="{Binding HasDue}" Value="False"/>
+                        <Condition Binding="{Binding ShowList}" Value="True"/>
+                    </MultiDataTrigger.Conditions>
+                    <Setter TargetName="listDot" Property="Visibility" Value="Visible"/>
+                </MultiDataTrigger>
+            </DataTemplate.Triggers>
+        </DataTemplate>
+
+        <!-- ===== Group heading / completed toggle ===== -->
+        <DataTemplate DataType="{x:Type v:RowHeader}">
+            <Button Style="{StaticResource LinkButton}" Click="Header_Click" Margin="6,10,0,2" Padding="6,4,10,4">
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Style="{StaticResource Icon}" FontSize="10" Text="{Binding Chevron}" Margin="0,1,8,0"/>
+                    <TextBlock Text="{Binding Text}" FontSize="13.5" FontWeight="SemiBold"/>
+                    <TextBlock Text="{Binding CountText}" FontSize="12.5" Margin="8,1,0,0" Opacity="0.75"/>
+                </StackPanel>
+            </Button>
+        </DataTemplate>
+    </Window.Resources>
+
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition x:Name="SidebarCol" Width="260"/>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition x:Name="DetailCol" Width="0"/>
+        </Grid.ColumnDefinitions>
+
+        <!-- ================= Sidebar ================= -->
+        <Border Background="{DynamicResource SidebarBg}">
+            <Grid Margin="12,14,12,10">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <StackPanel Orientation="Horizontal" Margin="6,0,0,14">
+                    <Image Source="Assets/taskflare-256.png" Width="30" Height="30" RenderOptions.BitmapScalingMode="HighQuality"/>
+                    <TextBlock Text="Taskflare" FontSize="21" FontWeight="SemiBold" Foreground="{DynamicResource SidebarText}"
+                               VerticalAlignment="Center" Margin="10,0,0,1"/>
+                </StackPanel>
+
+                <TextBox x:Name="SearchBox" Grid.Row="1" Style="{StaticResource SidebarSearch}" Tag="Search"
+                         TextChanged="SearchBox_TextChanged" KeyDown="SearchBox_KeyDown" Margin="0,0,0,12"/>
+
+                <!-- Smart lists -->
+                <StackPanel Grid.Row="2">
+                    <RadioButton x:Name="NavMyDay" Style="{StaticResource SidebarNav}" GroupName="nav" Tag="myday" Click="Nav_Click">
+                        <DockPanel>
+                            <TextBlock Style="{StaticResource Icon}" Text="&#xE706;" Width="28" HorizontalAlignment="Left" Foreground="#FBBF24"/>
+                            <TextBlock x:Name="CountMyDay" DockPanel.Dock="Right" FontSize="12.5" Foreground="{DynamicResource SidebarTextDim}" VerticalAlignment="Center"/>
+                            <TextBlock Text="My Day" VerticalAlignment="Center"/>
+                        </DockPanel>
+                    </RadioButton>
+                    <RadioButton x:Name="NavImportant" Style="{StaticResource SidebarNav}" GroupName="nav" Tag="important" Click="Nav_Click">
+                        <DockPanel>
+                            <TextBlock Style="{StaticResource Icon}" Text="&#xE734;" Width="28" HorizontalAlignment="Left"/>
+                            <TextBlock x:Name="CountImportant" DockPanel.Dock="Right" FontSize="12.5" Foreground="{DynamicResource SidebarTextDim}" VerticalAlignment="Center"/>
+                            <TextBlock Text="Important" VerticalAlignment="Center"/>
+                        </DockPanel>
+                    </RadioButton>
+                    <RadioButton x:Name="NavPlanned" Style="{StaticResource SidebarNav}" GroupName="nav" Tag="planned" Click="Nav_Click">
+                        <DockPanel>
+                            <TextBlock Style="{StaticResource Icon}" Text="&#xE787;" Width="28" HorizontalAlignment="Left"/>
+                            <TextBlock x:Name="CountPlanned" DockPanel.Dock="Right" FontSize="12.5" Foreground="{DynamicResource SidebarTextDim}" VerticalAlignment="Center"/>
+                            <TextBlock Text="Planned" VerticalAlignment="Center"/>
+                        </DockPanel>
+                    </RadioButton>
+                    <RadioButton x:Name="NavMuse" Style="{StaticResource SidebarNav}" GroupName="nav" Tag="muse" Click="Nav_Click">
+                        <DockPanel>
+                            <TextBlock Style="{StaticResource Icon}" Text="&#xE945;" Width="28" HorizontalAlignment="Left" Foreground="#C4B5FD"/>
+                            <TextBlock x:Name="CountMuse" DockPanel.Dock="Right" FontSize="12.5" Foreground="{DynamicResource SidebarTextDim}" VerticalAlignment="Center"/>
+                            <TextBlock Text="Added by Muse" VerticalAlignment="Center"/>
+                        </DockPanel>
+                    </RadioButton>
+                    <RadioButton x:Name="NavTasks" Style="{StaticResource SidebarNav}" GroupName="nav" Tag="tasks" Click="Nav_Click">
+                        <DockPanel>
+                            <TextBlock Style="{StaticResource Icon}" Text="&#xE9D5;" Width="28" HorizontalAlignment="Left"/>
+                            <TextBlock x:Name="CountTasks" DockPanel.Dock="Right" FontSize="12.5" Foreground="{DynamicResource SidebarTextDim}" VerticalAlignment="Center"/>
+                            <TextBlock Text="Tasks" VerticalAlignment="Center"/>
+                        </DockPanel>
+                    </RadioButton>
+
+                    <Border Height="1" Background="{DynamicResource SidebarDivider}" Margin="4,10,4,8"/>
+                    <TextBlock Text="Lists" FontSize="12.5" Foreground="{DynamicResource SidebarTextDim}" Margin="10,0,0,4"/>
+                </StackPanel>
+
+                <!-- User lists -->
+                <ScrollViewer Grid.Row="3" VerticalScrollBarVisibility="Auto" Focusable="False">
+                    <ItemsControl x:Name="ListsHost" AllowDrop="True">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate DataType="{x:Type m:TaskList}">
+                                <RadioButton Style="{StaticResource SidebarNav}" GroupName="nav" IsChecked="{Binding IsActive, Mode=TwoWay}"
+                                             Click="ListNav_Click" Tag="{Binding}" AllowDrop="True" Drop="ListNav_Drop" DragOver="ListNav_DragOver"
+                                             PreviewMouseLeftButtonDown="ListNav_PreviewDown" MouseMove="ListNav_MouseMove">
+                                    <RadioButton.ContextMenu>
+                                        <ContextMenu>
+                                            <MenuItem Header="Edit list…" Click="EditList_Click" Tag="{Binding}">
+                                                <MenuItem.Icon><TextBlock Text="&#xE70F;"/></MenuItem.Icon>
+                                            </MenuItem>
+                                            <MenuItem Header="Delete list" Click="DeleteList_Click" Tag="{Binding}">
+                                                <MenuItem.Icon><TextBlock Text="&#xE74D;"/></MenuItem.Icon>
+                                            </MenuItem>
+                                        </ContextMenu>
+                                    </RadioButton.ContextMenu>
+                                    <DockPanel>
+                                        <TextBlock Style="{StaticResource Icon}" Text="{Binding Glyph}" Width="28" HorizontalAlignment="Left"
+                                                   Foreground="{Binding Color, Converter={StaticResource HexBrush}}"/>
+                                        <Border DockPanel.Dock="Right" CornerRadius="9" MinWidth="22" Height="18" Padding="6,0" VerticalAlignment="Center"
+                                                Background="{Binding Color, Converter={StaticResource HexBrush}}"
+                                                Visibility="{Binding HasOpen, Converter={StaticResource BoolVis}}">
+                                            <TextBlock Text="{Binding OpenCount}" FontSize="11.5" FontWeight="SemiBold" Foreground="White"
+                                                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                        </Border>
+                                        <TextBlock Text="{Binding Name}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                                    </DockPanel>
+                                </RadioButton>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+
+                <StackPanel Grid.Row="4">
+                    <Button Style="{StaticResource SidebarButton}" Click="NewList_Click" Margin="0,4,0,0" Foreground="{DynamicResource SidebarAccent}">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Style="{StaticResource Icon}" Text="&#xE710;" Width="28" HorizontalAlignment="Left" FontSize="13"/>
+                            <TextBlock Text="New list" FontSize="14" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+                    <Border Height="1" Background="{DynamicResource SidebarDivider}" Margin="4,8,4,6"/>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition/>
+                            <ColumnDefinition/>
+                        </Grid.ColumnDefinitions>
+                        <Button x:Name="SettingsButton" Style="{StaticResource SidebarButton}" Click="Settings_Click">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Style="{StaticResource Icon}" Text="&#xE713;" FontSize="13" Margin="0,0,8,0"/>
+                                <TextBlock Text="Settings" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
+                        <Button Grid.Column="1" Style="{StaticResource SidebarButton}" Click="Help_Click">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Style="{StaticResource Icon}" Text="&#xE897;" FontSize="13" Margin="0,0,8,0"/>
+                                <TextBlock Text="Help &amp; feedback" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
+                    </Grid>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- ================= Task pane ================= -->
+        <Grid x:Name="TaskPane" Grid.Column="1" Background="{DynamicResource PaneBg}">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+            <!-- Header -->
+            <Grid Margin="28,20,20,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock x:Name="ViewGlyph" Style="{StaticResource Icon}" FontSize="22" Margin="0,2,12,0" Foreground="{DynamicResource Accent}" Visibility="Collapsed"/>
+                    <TextBlock x:Name="ViewTitle" Text="My Day" FontSize="24" FontWeight="Bold" Foreground="{DynamicResource Text}" TextTrimming="CharacterEllipsis"/>
+                </StackPanel>
+                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Button x:Name="SortButton" Style="{StaticResource FlatBase}" Click="Sort_Click" Padding="10,6" Foreground="{DynamicResource TextSecondary}" ToolTip="Sort">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Style="{StaticResource Icon}" Text="&#xE8CB;" FontSize="14" Margin="0,0,8,0"/>
+                            <TextBlock x:Name="SortText" Text="Sort" FontSize="13.5"/>
+                        </StackPanel>
+                    </Button>
+                    <Button x:Name="MoreButton" Style="{StaticResource IconButton}" Content="&#xE712;" Click="More_Click" ToolTip="More options" Foreground="{DynamicResource TextSecondary}"/>
+                    <Button x:Name="SuggestButton" Style="{StaticResource IconButton}" Content="&#xE82F;" Click="Suggest_Click" ToolTip="Suggestions for My Day" Foreground="{DynamicResource TextSecondary}"/>
+                </StackPanel>
+            </Grid>
+            <TextBlock x:Name="ViewSubtitle" Grid.Row="1" Margin="28,4,0,12" FontSize="13.5" Foreground="{DynamicResource TextSecondary}" Text="Today · 0 tasks"/>
+
+            <!-- Add a task -->
+            <StackPanel x:Name="AddArea" Grid.Row="2" Margin="24,0,24,6">
+                <Border x:Name="AddBorder" CornerRadius="8" BorderThickness="1" BorderBrush="{DynamicResource InputBorder}" Background="{DynamicResource InputBg}" MinHeight="50">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="44"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Style="{StaticResource Icon}" Text="&#xE710;" FontSize="16" Foreground="{DynamicResource Accent}"/>
+                        <TextBox x:Name="AddBox" Grid.Column="1" Style="{StaticResource BareBox}" Tag="Add a task" FontSize="14.5"
+                                 KeyDown="AddBox_KeyDown" TextChanged="AddBox_TextChanged" GotKeyboardFocus="AddBox_Focus" LostKeyboardFocus="AddBox_Focus"
+                                 ToolTip="Type a task and press Enter. Try: Call mom tomorrow 5pm #Personal p1"/>
+                        <StackPanel Grid.Column="2" Orientation="Horizontal" Margin="0,0,8,0" VerticalAlignment="Center">
+                            <Button x:Name="AddDueButton" Style="{StaticResource IconButton}" Content="&#xE787;" Click="AddDue_Click" ToolTip="Add due date" Foreground="{DynamicResource TextSecondary}"/>
+                            <Button x:Name="AddRemindButton" Style="{StaticResource IconButton}" Content="&#xEA8F;" Click="AddRemind_Click" ToolTip="Remind me" Foreground="{DynamicResource TextSecondary}"/>
+                            <Button x:Name="AddRepeatButton" Style="{StaticResource IconButton}" Content="&#xE8EE;" Click="AddRepeat_Click" ToolTip="Repeat" Foreground="{DynamicResource TextSecondary}"/>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+                <WrapPanel x:Name="AddChips" Margin="2,8,0,0" Visibility="Collapsed"/>
+            </StackPanel>
+
+            <!-- The tasks -->
+            <ListBox x:Name="TaskView" Grid.Row="3" Margin="18,4,12,0" Background="Transparent" BorderThickness="0" Padding="0"
+                     ItemContainerStyle="{StaticResource TaskRowContainer}" HorizontalContentAlignment="Stretch"
+                     ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                     VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling" VirtualizingPanel.ScrollUnit="Pixel"
+                     SelectionMode="Single" SelectionChanged="TaskView_SelectionChanged" KeyDown="TaskView_KeyDown"
+                     PreviewMouseLeftButtonDown="TaskView_PreviewDown" MouseMove="TaskView_MouseMove" AllowDrop="True" Drop="TaskView_Drop"
+                     DragOver="TaskView_DragOver" ContextMenuOpening="TaskView_ContextMenuOpening">
+                <ListBox.ContextMenu>
+                    <ContextMenu x:Name="TaskMenu"/>
+                </ListBox.ContextMenu>
+            </ListBox>
+
+            <!-- Empty state -->
+            <StackPanel x:Name="EmptyState" Grid.Row="3" VerticalAlignment="Center" HorizontalAlignment="Center" Margin="0,0,0,80" IsHitTestVisible="False">
+                <TextBlock x:Name="EmptyGlyph" Style="{StaticResource Icon}" FontSize="54" Text="&#xE706;" Foreground="{DynamicResource Accent}" Opacity="0.85"/>
+                <TextBlock x:Name="EmptyTitle" Text="Focus on your day" FontSize="18" FontWeight="SemiBold" HorizontalAlignment="Center" Margin="0,16,0,6" Foreground="{DynamicResource Text}"/>
+                <TextBlock x:Name="EmptyText" Text="Get things done with My Day, a list that refreshes every day." FontSize="13.5" Foreground="{DynamicResource TextSecondary}"
+                           HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" MaxWidth="360"/>
+            </StackPanel>
+
+            <!-- Settings page (covers the task pane) -->
+            <Grid x:Name="SettingsPage" Grid.RowSpan="4" Background="{DynamicResource PaneBg}" Visibility="Collapsed">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel x:Name="SettingsHost" Margin="32,22,32,30" MaxWidth="760" HorizontalAlignment="Left"/>
+                </ScrollViewer>
+            </Grid>
+        </Grid>
+
+        <!-- ================= Detail pane ================= -->
+        <Border x:Name="DetailPane" Grid.Column="2" Background="{DynamicResource DetailBg}" BorderBrush="{DynamicResource Divider}" BorderThickness="1,0,0,0"
+                Visibility="Collapsed">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="14,16,14,16">
+                        <!-- Title + steps -->
+                        <Border Background="{DynamicResource PaneBg}" CornerRadius="8" BorderBrush="{DynamicResource Divider}" BorderThickness="1" Padding="10,10,8,6">
+                            <StackPanel>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="30"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="28"/>
+                                    </Grid.ColumnDefinitions>
+                                    <CheckBox x:Name="DetailCheck" Style="{StaticResource TaskCheck}" Click="DetailCheck_Click" VerticalAlignment="Top" Margin="0,4,0,0"/>
+                                    <TextBox x:Name="DetailTitle" Grid.Column="1" Style="{StaticResource BareBox}" FontSize="17" FontWeight="SemiBold" TextWrapping="Wrap"
+                                             Tag="Task name" LostKeyboardFocus="DetailTitle_LostFocus" KeyDown="DetailTitle_KeyDown" Padding="2,2,2,4"/>
+                                    <ToggleButton x:Name="DetailStar" Grid.Column="2" Style="{StaticResource StarToggle}" Click="DetailStar_Click" VerticalAlignment="Top" Margin="0,4,0,0"/>
+                                </Grid>
+                                <ItemsControl x:Name="StepsHost" Margin="0,4,0,0">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate DataType="{x:Type m:TaskStep}">
+                                            <Grid Margin="2,1" MinHeight="32" x:Name="stepRow" Background="Transparent">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="28"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="28"/>
+                                                </Grid.ColumnDefinitions>
+                                                <CheckBox Style="{StaticResource StepCheck}" IsChecked="{Binding Done, Mode=OneWay}" Click="StepCheck_Click" HorizontalAlignment="Left"/>
+                                                <TextBox x:Name="stepText" Grid.Column="1" Style="{StaticResource BareBox}" Text="{Binding Title, Mode=OneWay}" FontSize="13.5"
+                                                         LostKeyboardFocus="StepText_LostFocus" KeyDown="StepText_KeyDown" TextWrapping="Wrap"/>
+                                                <Button Grid.Column="2" Style="{StaticResource IconButton}" Width="24" Height="24" FontSize="10" Content="&#xE711;"
+                                                        Click="StepDelete_Click" ToolTip="Delete step" Foreground="{DynamicResource TextSecondary}"/>
+                                            </Grid>
+                                            <DataTemplate.Triggers>
+                                                <DataTrigger Binding="{Binding Done}" Value="True">
+                                                    <Setter TargetName="stepText" Property="Foreground" Value="{DynamicResource TextDim}"/>
+                                                </DataTrigger>
+                                            </DataTemplate.Triggers>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                                <Grid Margin="2,2,0,2" MinHeight="34">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="28"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Style="{StaticResource Icon}" Text="&#xE710;" FontSize="13" Foreground="{DynamicResource Accent}" HorizontalAlignment="Left" Margin="2,0,0,0"/>
+                                    <TextBox x:Name="NewStepBox" Grid.Column="1" Style="{StaticResource BareBox}" Tag="Add step" FontSize="13.5" KeyDown="NewStep_KeyDown"/>
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- My Day -->
+                        <Border Background="{DynamicResource PaneBg}" CornerRadius="8" BorderBrush="{DynamicResource Divider}" BorderThickness="1" Margin="0,10,0,0" ClipToBounds="True">
+                            <Button x:Name="DetailMyDay" Style="{StaticResource DetailRow}" Tag="&#xE706;" Click="DetailMyDay_Click" Content="Add to My Day"/>
+                        </Border>
+
+                        <!-- Dates -->
+                        <Border Background="{DynamicResource PaneBg}" CornerRadius="8" BorderBrush="{DynamicResource Divider}" BorderThickness="1" Margin="0,10,0,0" ClipToBounds="True">
+                            <StackPanel>
+                                <Button x:Name="DetailRemind" Style="{StaticResource DetailRow}" Tag="&#xEA8F;" Click="DetailRemind_Click" Content="Remind me"/>
+                                <Border Height="1" Background="{DynamicResource Divider}" Margin="14,0"/>
+                                <Button x:Name="DetailDue" Style="{StaticResource DetailRow}" Tag="&#xE787;" Click="DetailDue_Click" Content="Add due date"/>
+                                <Border Height="1" Background="{DynamicResource Divider}" Margin="14,0"/>
+                                <Button x:Name="DetailRepeat" Style="{StaticResource DetailRow}" Tag="&#xE8EE;" Click="DetailRepeat_Click" Content="Repeat"/>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Priority, list, labels -->
+                        <Border Background="{DynamicResource PaneBg}" CornerRadius="8" BorderBrush="{DynamicResource Divider}" BorderThickness="1" Margin="0,10,0,0" ClipToBounds="True">
+                            <StackPanel>
+                                <Button x:Name="DetailPriority" Style="{StaticResource DetailRow}" Tag="&#xE7C1;" Click="DetailPriority_Click" Content="Priority"/>
+                                <Border Height="1" Background="{DynamicResource Divider}" Margin="14,0"/>
+                                <Button x:Name="DetailList" Style="{StaticResource DetailRow}" Tag="&#xE8FD;" Click="DetailList_Click" Content="Tasks"/>
+                                <Border Height="1" Background="{DynamicResource Divider}" Margin="14,0"/>
+                                <Grid MinHeight="46" Margin="14,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="30"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Style="{StaticResource Icon}" Text="&#xE8EC;" FontSize="15" HorizontalAlignment="Left" Foreground="{DynamicResource TextSecondary}"/>
+                                    <TextBox x:Name="DetailLabels" Grid.Column="1" Style="{StaticResource BareBox}" Tag="Add labels (comma separated)" FontSize="13.5"
+                                             LostKeyboardFocus="DetailLabels_LostFocus" KeyDown="DetailLabels_KeyDown"/>
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Notes -->
+                        <Border Background="{DynamicResource PaneBg}" CornerRadius="8" BorderBrush="{DynamicResource Divider}" BorderThickness="1" Margin="0,10,0,0" MinHeight="110">
+                            <TextBox x:Name="DetailNotes" Style="{StaticResource BareBox}" Tag="Add note" AcceptsReturn="True" TextWrapping="Wrap"
+                                     VerticalContentAlignment="Top" Padding="12,10" FontSize="13.5" LostKeyboardFocus="DetailNotes_LostFocus" MinHeight="110"/>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+
+                <!-- Footer -->
+                <Grid Grid.Row="1" Height="48" Margin="6,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <Button Style="{StaticResource IconButton}" Content="&#xE76C;" Click="DetailClose_Click" ToolTip="Hide details (Esc)" Foreground="{DynamicResource TextSecondary}"/>
+                    <TextBlock x:Name="DetailCreated" Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="12.5" Foreground="{DynamicResource TextSecondary}"/>
+                    <Button Grid.Column="2" Style="{StaticResource IconButton}" Content="&#xE74D;" Click="DetailDelete_Click" ToolTip="Delete task" Foreground="{DynamicResource TextSecondary}"/>
+                </Grid>
+            </Grid>
+        </Border>
+
+        <GridSplitter x:Name="DetailSplitter" Grid.Column="2" HorizontalAlignment="Left" Width="4" Background="Transparent" Visibility="Collapsed"/>
+    </Grid>
+</Window>
