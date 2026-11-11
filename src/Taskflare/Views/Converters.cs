@@ -52,6 +52,8 @@ public sealed class RowHeader : Taskflare.Models.Notify
     public string Text { get => _text; set => Set(ref _text, value); }
     public int Count { get => _count; set { if (Set(ref _count, value)) Raise(nameof(CountText)); } }
     public string CountText => _count.ToString();
+    private bool _showCount = true;
+    public bool ShowCount { get => _showCount; set => Set(ref _showCount, value); }
     public bool Expanded { get => _expanded; set { if (Set(ref _expanded, value)) Raise(nameof(Chevron)); } }
     public string Chevron => _expanded ? "" : "";
 }

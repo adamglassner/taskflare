@@ -77,7 +77,7 @@ public sealed class TaskItem : Notify
     public bool ReminderFired { get; set; }
     public Repeat Repeat { get => _repeat; set { if (Set(ref _repeat, value)) Raise(nameof(HasRepeat), nameof(RepeatText)); } }
     /// <summary>The day it was added to My Day. It's in My Day only while this is today.</summary>
-    public DateTime? MyDay { get => _myDay; set { if (Set(ref _myDay, value?.Date)) Raise(nameof(InMyDay)); } }
+    public DateTime? MyDay { get => _myDay; set { if (Set(ref _myDay, value?.Date)) Raise(nameof(InMyDay), nameof(MyDayTag)); } }
     public bool Completed { get => _completed; set => Set(ref _completed, value); }
     public DateTime? CompletedAt { get => _completedAt; set => Set(ref _completedAt, value); }
     public ObservableCollection<TaskStep> Steps { get; set; } = new();
@@ -100,6 +100,10 @@ public sealed class TaskItem : Notify
     /// <summary>Hide the list name on the row when you're looking at that list already.</summary>
     [JsonIgnore] public bool ShowList { get => _showList; set => Set(ref _showList, value); }
     [JsonIgnore] public bool IsSelected { get => _selected; set => Set(ref _selected, value); }
+    private bool _showMyDay = true;
+    /// <summary>False in the My Day view itself, where the "My Day" tag would be noise.</summary>
+    [JsonIgnore] public bool ShowMyDay { get => _showMyDay; set { if (Set(ref _showMyDay, value)) Raise(nameof(MyDayTag)); } }
+    [JsonIgnore] public bool MyDayTag => _showMyDay && InMyDay;
 
     [JsonIgnore] public bool FromMuse => string.Equals(Source, "muse", StringComparison.OrdinalIgnoreCase);
     [JsonIgnore] public bool InMyDay => _myDay.HasValue && _myDay.Value.Date == DateTime.Today;

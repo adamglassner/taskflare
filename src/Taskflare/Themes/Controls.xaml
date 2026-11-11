@@ -1042,6 +1042,7 @@
     <!-- On/off switch for settings -->
     <Style x:Key="Switch" TargetType="CheckBox">
         <Setter Property="Foreground" Value="{DynamicResource Text}"/>
+        <Setter Property="MinHeight" Value="34"/>
         <Setter Property="Cursor" Value="Hand"/>
         <Setter Property="Margin" Value="0,6"/>
         <Setter Property="FocusVisualStyle" Value="{StaticResource FocusRingVisual}"/>

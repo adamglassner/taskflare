@@ -259,7 +259,11 @@ public partial class MainWindow : Window
         {
             var today = DateTime.Today;
             var tasks = ViewTasks();
-            foreach (var t in tasks) t.ShowList = _view is not ("list" or "tasks");
+            foreach (var t in tasks)
+            {
+                t.ShowList = _view is not ("list" or "tasks");
+                t.ShowMyDay = _view != "myday";
+            }
             var open = Sorted(tasks.Where(t => !t.Completed)).ToList();
             var done = tasks.Where(t => t.Completed).OrderByDescending(t => t.CompletedAt ?? t.UpdatedAt).ToList();
             var rows = new List<object>();
@@ -287,6 +291,7 @@ public partial class MainWindow : Window
             {
                 var h = Header("completed", "", done.Count, completed: true, defaultExpanded: false);
                 h.Text = h.Expanded ? "Completed" : $"+ {done.Count} completed task{(done.Count == 1 ? "" : "s")}";
+                h.ShowCount = h.Expanded;
                 rows.Add(h);
                 if (h.Expanded) rows.AddRange(done);
             }

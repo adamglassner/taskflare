@@ -214,9 +214,9 @@ public partial class MainWindow
             c.Children.Add(tunnelRow);
             var ts = Ui.Text(TunnelService.PublicUrl != null ? "Public link: " + TunnelService.PublicUrl : TunnelService.Status, TunnelService.PublicUrl != null ? "Success" : "TextSecondary", 12.5);
             ts.Margin = new Thickness(28, 6, 0, 0);
-            c.Children.Add(ts);
+            if (TunnelService.PublicUrl != null || TunnelService.Status != "Off") c.Children.Add(ts);
             var auto = Switch("Start the public link whenever Taskflare starts", null, s.MuseAutoTunnel, v => s.MuseAutoTunnel = v);
-            auto.Margin = new Thickness(28, 4, 0, 0);
+            auto.Margin = new Thickness(28, 6, 0, 6);
             c.Children.Add(auto);
 
             // Step 2: add to Muse
@@ -247,10 +247,10 @@ public partial class MainWindow
             // Step 3: permissions
             c.Children.Add(Step("3", "Choose what Muse may do", "Muse can always add tasks and read them (so it doesn't add duplicates)."));
             var edits = Switch("Let Muse complete, change and delete tasks", null, s.MuseAllowEdits, v => s.MuseAllowEdits = v);
-            edits.Margin = new Thickness(28, 2, 0, 0);
+            edits.Margin = new Thickness(28, 6, 0, 6);
             c.Children.Add(edits);
             var notify = Switch("Show a notification when Muse adds a task", null, s.MuseNotify, v => s.MuseNotify = v);
-            notify.Margin = new Thickness(28, 0, 0, 0);
+            notify.Margin = new Thickness(28, 6, 0, 6);
             c.Children.Add(notify);
 
             // Advanced

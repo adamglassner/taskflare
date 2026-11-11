@@ -41,7 +41,7 @@
                         </Border>
                     </DockPanel>
                     <WrapPanel x:Name="meta" Margin="0,3,0,0">
-                        <StackPanel Orientation="Horizontal" Visibility="{Binding InMyDay, Converter={StaticResource BoolVis}}" Margin="0,0,10,0"
+                        <StackPanel Orientation="Horizontal" Visibility="{Binding MyDayTag, Converter={StaticResource BoolVis}}" Margin="0,0,10,0"
                                     x:Name="myDayMeta">
                             <TextBlock Style="{StaticResource MetaIcon}" Text="&#xE706;"/>
                             <TextBlock Style="{StaticResource Meta}" Text="My Day"/>
@@ -126,7 +126,8 @@
                 <StackPanel Orientation="Horizontal">
                     <TextBlock Style="{StaticResource Icon}" FontSize="10" Text="{Binding Chevron}" Margin="0,1,8,0"/>
                     <TextBlock Text="{Binding Text}" FontSize="13.5" FontWeight="SemiBold"/>
-                    <TextBlock Text="{Binding CountText}" FontSize="12.5" Margin="8,1,0,0" Opacity="0.75"/>
+                    <TextBlock Text="{Binding CountText}" FontSize="12.5" Margin="8,1,0,0" Opacity="0.75"
+                               Visibility="{Binding ShowCount, Converter={StaticResource BoolVis}}"/>
                 </StackPanel>
             </Button>
         </DataTemplate>
@@ -258,7 +259,7 @@
                         <Button Grid.Column="1" Style="{StaticResource SidebarButton}" Click="Help_Click">
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Style="{StaticResource Icon}" Text="&#xE897;" FontSize="13" Margin="0,0,8,0"/>
-                                <TextBlock Text="Help &amp; feedback" VerticalAlignment="Center"/>
+                                <TextBlock Text="Help" VerticalAlignment="Center"/>
                             </StackPanel>
                         </Button>
                     </Grid>
@@ -281,10 +282,11 @@
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
-                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <DockPanel VerticalAlignment="Center">
                     <TextBlock x:Name="ViewGlyph" Style="{StaticResource Icon}" FontSize="22" Margin="0,2,12,0" Foreground="{DynamicResource Accent}" Visibility="Collapsed"/>
-                    <TextBlock x:Name="ViewTitle" Text="My Day" FontSize="24" FontWeight="Bold" Foreground="{DynamicResource Text}" TextTrimming="CharacterEllipsis"/>
-                </StackPanel>
+                    <TextBlock x:Name="ViewTitle" Text="My Day" FontSize="24" FontWeight="Bold" Foreground="{DynamicResource Text}" TextTrimming="CharacterEllipsis"
+                               ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"/>
+                </DockPanel>
                 <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
                     <Button x:Name="SortButton" Style="{StaticResource FlatBase}" Click="Sort_Click" Padding="10,6" Foreground="{DynamicResource TextSecondary}" ToolTip="Sort">
                         <StackPanel Orientation="Horizontal">
