@@ -180,7 +180,7 @@ public partial class MainWindow
             var status = MuseServer.IsRunning
                 ? $"Running on this PC at {MuseServer.LocalBase}" + (MuseServer.RequestCount > 0 ? $" · {MuseServer.RequestCount} request{(MuseServer.RequestCount == 1 ? "" : "s")}, last {MuseServer.LastRequest:t}" : " · waiting for Muse")
                 : MuseServer.Error ?? "Starting…";
-            var st = Ui.Text(status, MuseServer.IsRunning ? "Success" : "Danger", 13);
+            var st = Ui.Text(status, MuseServer.IsRunning ? "Success" : MuseServer.Error != null ? "Danger" : "TextSecondary", 13);
             st.Margin = new Thickness(0, 4, 0, 8);
             c.Children.Add(st);
 
