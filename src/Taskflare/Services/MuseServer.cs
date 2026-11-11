@@ -382,24 +382,24 @@ public static class MuseServer
         var scheme = ctx.Request.Headers["X-Forwarded-Proto"].ToString();
         if (string.IsNullOrEmpty(scheme)) scheme = host.Contains("trycloudflare", StringComparison.OrdinalIgnoreCase) ? "https" : ctx.Request.Scheme;
         var b = $"{scheme}://{host}{ctx.Request.PathBase}{ctx.Request.Path.Value?.TrimEnd('/')}";
-        return $"""
+        return $$"""
         Taskflare API — the user's to-do list on their Windows PC.
         All requests and responses are JSON. The key is already part of this address.
 
-        {MuseTools.Instructions}
+        {{MuseTools.Instructions}}
 
-        GET    {b}/tasks                     List open tasks. Query: view=all|my_day|important|planned|overdue|today|completed|muse, list=<name>, search=<text>, limit=<n>
-        POST   {b}/tasks                     Add a task:  {{"title": "Book dentist", "list": "Personal", "due_date": "2026-11-20", "due_time": "14:00", "priority": "high", "important": true, "add_to_my_day": true, "notes": "...", "steps": ["..."], "repeat": "weekly", "reminder": "2026-11-20T13:30"}}
-                                             Several at once: {{"tasks": [{{"title": "Milk"}}, {{"title": "Eggs"}}], "list": "Shopping"}}
-        POST   {b}/quick-add                 {{"text": "Call mom tomorrow 5pm #Personal p1"}}
-        GET    {b}/tasks/<id>                One task
-        PATCH  {b}/tasks/<id>                Change fields (same names as POST; "" clears a date)
-        POST   {b}/tasks/<id>/complete       Tick it off   (…/uncomplete to undo)
-        DELETE {b}/tasks/<id>                Delete it
-        GET    {b}/lists                     Lists and their open-task counts
-        POST   {b}/lists                     {{"name": "Holiday packing", "color": "#22C55E"}}
+        GET    {{b}}/tasks                     List open tasks. Query: view=all|my_day|important|planned|overdue|today|completed|muse, list=<name>, search=<text>, limit=<n>
+        POST   {{b}}/tasks                     Add a task:  {"title": "Book dentist", "list": "Personal", "due_date": "2026-11-20", "due_time": "14:00", "priority": "high", "important": true, "add_to_my_day": true, "notes": "...", "steps": ["..."], "repeat": "weekly", "reminder": "2026-11-20T13:30"}
+                                             Several at once: {"tasks": [{"title": "Milk"}, {"title": "Eggs"}], "list": "Shopping"}
+        POST   {{b}}/quick-add                 {"text": "Call mom tomorrow 5pm #Personal p1"}
+        GET    {{b}}/tasks/<id>                One task
+        PATCH  {{b}}/tasks/<id>                Change fields (same names as POST; "" clears a date)
+        POST   {{b}}/tasks/<id>/complete       Tick it off   (…/uncomplete to undo)
+        DELETE {{b}}/tasks/<id>                Delete it
+        GET    {{b}}/lists                     Lists and their open-task counts
+        POST   {{b}}/lists                     {"name": "Holiday packing", "color": "#22C55E"}
 
-        MCP clients can use {b.Replace("/api/", "/mcp/")} instead (streamable HTTP).
+        MCP clients can use {{b.Replace("/api/", "/mcp/")}} instead (streamable HTTP).
         """;
     }
 
