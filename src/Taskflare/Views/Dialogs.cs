@@ -57,6 +57,7 @@ public static class ListDialog
         var colors = new WrapPanel { Margin = new Thickness(0, 6, 0, 0) };
         root.Children.Add(colors);
         var swatches = new List<Button>();
+        var iconButtons = new List<ToggleButton>();
         foreach (var c in ListColors.All)
         {
             var b = new Button
@@ -78,7 +79,6 @@ public static class ListDialog
         root.Children.Add(Ui.Text("Icon", "TextSecondary", 12.5));
         var icons = new WrapPanel { Margin = new Thickness(0, 6, 0, 0) };
         root.Children.Add(icons);
-        var iconButtons = new List<ToggleButton>();
         foreach (var (key, glyph) in ListIcons.All)
         {
             var b = new ToggleButton { Content = glyph, Style = Ui.S("IconToggle"), FontFamily = (FontFamily)Application.Current.FindResource("IconFont"), Margin = new Thickness(0, 0, 6, 6), Tag = key };

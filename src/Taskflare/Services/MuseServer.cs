@@ -79,7 +79,7 @@ public static class MuseServer
         IsRunning = false;
         if (app != null)
         {
-            try { await app.StopAsync(TimeSpan.FromSeconds(2)); } catch { }
+            try { using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2)); await app.StopAsync(cts.Token); } catch { }
             try { await app.DisposeAsync(); } catch { }
         }
         StatusChanged?.Invoke();
