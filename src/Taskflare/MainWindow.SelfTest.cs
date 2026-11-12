@@ -413,6 +413,32 @@ public partial class MainWindow
             ShowView("myday");
         });
 
+        await Test("Pop-ups use the normal font (date picker, suggestions)", async () =>
+        {
+            foreach (var dark in new[] { false, true })
+            {
+                SettingsService.Current.Theme = dark ? ThemeMode.Dark : ThemeMode.Light;
+                SettingsService.Commit();
+                ShowView("myday");
+                AddDue_Click(AddDueButton, new RoutedEventArgs());
+                await Settle();
+                var popup = Views.DatePopup.LastOpened;
+                Assert(popup?.Child is FrameworkElement, "date pop-up opened");
+                CheckFonts((FrameworkElement)popup.Child, "date pop-up");
+                await ShotOf((FrameworkElement)popup.Child, dark ? "20-date-popup-dark" : "20-date-popup-light");
+                popup.IsOpen = false;
+
+                Suggest_Click(SuggestButton, new RoutedEventArgs());
+                await Settle();
+                Assert(_lastSuggest?.Child is FrameworkElement, "suggestions opened");
+                CheckFonts((FrameworkElement)_lastSuggest.Child, "suggestions");
+                await ShotOf((FrameworkElement)_lastSuggest.Child, dark ? "21-suggest-dark" : "21-suggest-light");
+                _lastSuggest.IsOpen = false;
+            }
+            SettingsService.Current.Theme = ThemeMode.Light;
+            SettingsService.Commit();
+        });
+
         await Test("Reminder pops up", async () =>
         {
             var t = TaskStore.Tasks.First(x => !x.Completed);
@@ -429,6 +455,44 @@ public partial class MainWindow
         File.AppendAllText(App.SelfTestOutput, _testFails == 0 ? "ALL PASSED\r\n" : $"{_testFails} FAILED\r\n");
         TaskStore.Flush();
         Environment.Exit(_testFails);
+    }
+
+    /// <summary>Every text in the pop-up that isn't an icon must use the UI font, not the icon font.</summary>
+    private void CheckFonts(FrameworkElement root, string what)
+    {
+        var iconFont = (FontFamily)FindResource("IconFont");
+        foreach (var tb in FindAll<System.Windows.Controls.TextBlock>(root))
+        {
+            if (string.IsNullOrEmpty(tb.Text) || tb.Text.All(ch => ch >= '\uE000' && ch <= '\uF8FF')) continue; // icons
+            Assert(tb.FontFamily.Source != iconFont.Source, $"{what}: \"{tb.Text}\" is drawn with the icon font");
+        }
+    }
+
+    private static IEnumerable<T> FindAll<T>(DependencyObject d) where T : DependencyObject
+    {
+        for (int i = 0; i < VisualTreeHelper.GetChildrenCount(d); i++)
+        {
+            var c = VisualTreeHelper.GetChild(d, i);
+            if (c is T t) yield return t;
+            foreach (var x in FindAll<T>(c)) yield return x;
+        }
+    }
+
+    /// <summary>Saves a picture of one element (used for pop-ups, which are separate windows).</summary>
+    private async Task ShotOf(FrameworkElement el, string name)
+    {
+        if (App.SelfTestShots == null) return;
+        await Settle(300);
+        var dpi = VisualTreeHelper.GetDpi(el);
+        int w = (int)Math.Ceiling(el.ActualWidth * dpi.DpiScaleX), h = (int)Math.Ceiling(el.ActualHeight * dpi.DpiScaleY);
+        if (w <= 0 || h <= 0) return;
+        var bmp = new RenderTargetBitmap(w, h, dpi.PixelsPerInchX, dpi.PixelsPerInchY, PixelFormats.Pbgra32);
+        bmp.Render(el);
+        var enc = new PngBitmapEncoder();
+        enc.Frames.Add(BitmapFrame.Create(bmp));
+        Directory.CreateDirectory(App.SelfTestShots);
+        using var fs = File.Create(Path.Combine(App.SelfTestShots, name + ".png"));
+        enc.Save(fs);
     }
 
     private static T FindChild<T>(DependencyObject d) where T : DependencyObject

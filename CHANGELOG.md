@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.1.1 (2026-11-11)
+
+- Fixed the date picker and the lightbulb suggestions showing boxes instead of text.
+
 ## 1.1.0 (2026-11-11)
 
 - Works with more AI assistants: Claude, ChatGPT, Gemini, Grok and Meta's Muse can connect as a custom connector, and Siri can add tasks through an Apple Shortcut. Settings › AI assistants has step-by-step setup for each one, with its own link.

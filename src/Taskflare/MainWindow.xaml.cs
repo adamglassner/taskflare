@@ -775,6 +775,7 @@ public partial class MainWindow : Window
         var border = new Border { Width = 340, MaxHeight = 520, CornerRadius = new CornerRadius(10), BorderThickness = new Thickness(1), Padding = new Thickness(12), Margin = new Thickness(0, 4, 12, 12) };
         border.SetResourceReference(Border.BackgroundProperty, "MenuBg");
         border.SetResourceReference(Border.BorderBrushProperty, "MenuBorder");
+        border.SetResourceReference(System.Windows.Documents.TextElement.FontFamilyProperty, "UiFont");
         border.Effect = new System.Windows.Media.Effects.DropShadowEffect { BlurRadius = 16, ShadowDepth = 3, Opacity = 0.25 };
         var stack = new StackPanel();
         stack.Children.Add(Ui.Text("Suggestions", "Text", 15, FontWeights.SemiBold));
@@ -820,7 +821,10 @@ public partial class MainWindow : Window
         border.Child = new ScrollViewer { Content = stack, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
         popup.Child = border;
         popup.IsOpen = true;
+        _lastSuggest = popup;
     }
+
+    private Popup _lastSuggest;
 
     // =====================================================================
     // Lists (sidebar)

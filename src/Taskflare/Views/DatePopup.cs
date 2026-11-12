@@ -16,6 +16,9 @@ namespace Taskflare.Views;
 /// </summary>
 public static class DatePopup
 {
+    /// <summary>The most recent pop-up (for the self-test).</summary>
+    internal static Popup LastOpened;
+
     public static Popup Open(UIElement target, DateTime? current, bool withTime, TimeSpan? currentTime, Action<DateTime?, TimeSpan?> onPick, string title = "Due date")
     {
         var popup = new Popup
@@ -32,6 +35,8 @@ public static class DatePopup
 
         var root = new Border { CornerRadius = new CornerRadius(10), BorderThickness = new Thickness(1), Padding = new Thickness(10), Margin = new Thickness(0, 4, 12, 12), Width = 290 };
         root.SetResourceReference(Border.BackgroundProperty, "MenuBg");
+        // A pop-up inherits fonts from the button that opened it, which uses the icon font. Use the normal UI font.
+        root.SetResourceReference(TextElement.FontFamilyProperty, "UiFont");
         root.SetResourceReference(Border.BorderBrushProperty, "MenuBorder");
         root.Effect = new System.Windows.Media.Effects.DropShadowEffect { BlurRadius = 16, ShadowDepth = 3, Opacity = 0.25 };
         var stack = new StackPanel();
@@ -187,6 +192,7 @@ public static class DatePopup
 
         popup.Child = root;
         popup.IsOpen = true;
+        LastOpened = popup;
         return popup;
     }
 
