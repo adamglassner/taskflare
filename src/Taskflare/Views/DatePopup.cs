@@ -103,6 +103,14 @@ public static class DatePopup
         head.Children.Add(next);
         stack.Children.Add(head);
 
+        var dayNames = new UniformGrid { Columns = 7 };
+        foreach (var n in new[] { "Su", "Mo", "Tu", "We", "Th", "Fr", "Sa" })
+        {
+            var h = new TextBlock { Text = n, FontSize = 11.5, HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 2, 0, 4) };
+            h.SetResourceReference(TextBlock.ForegroundProperty, "TextSecondary");
+            dayNames.Children.Add(h);
+        }
+        stack.Children.Add(dayNames);
         var days = new UniformGrid { Columns = 7 };
         stack.Children.Add(days);
 
@@ -110,12 +118,6 @@ public static class DatePopup
         {
             monthText.Text = month.ToString("MMMM yyyy", CultureInfo.CurrentCulture);
             days.Children.Clear();
-            foreach (var n in new[] { "Su", "Mo", "Tu", "We", "Th", "Fr", "Sa" })
-            {
-                var h = new TextBlock { Text = n, FontSize = 11.5, HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 2, 0, 4) };
-                h.SetResourceReference(TextBlock.ForegroundProperty, "TextSecondary");
-                days.Children.Add(h);
-            }
             var start = month.AddDays(-(int)month.DayOfWeek);
             for (int i = 0; i < 42; i++)
             {
