@@ -32,11 +32,11 @@
                                            Foreground="{DynamicResource LowPillText}"/>
                             </StackPanel>
                         </Border>
-                        <Border Style="{StaticResource Pill}" Background="{DynamicResource MuseSoft}" Visibility="{Binding FromMuse, Converter={StaticResource BoolVis}}"
-                                ToolTip="Added by Muse">
+                        <Border Style="{StaticResource Pill}" Background="{DynamicResource MuseSoft}" Visibility="{Binding FromAi, Converter={StaticResource BoolVis}}"
+                                ToolTip="{Binding CreatedText}">
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Style="{StaticResource Icon}" FontSize="10" Text="&#xE945;" Margin="0,1,4,0" Foreground="{DynamicResource MuseBadge}"/>
-                                <TextBlock Text="Muse" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource MuseBadge}"/>
+                                <TextBlock Text="{Binding AddedByName}" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource MuseBadge}"/>
                             </StackPanel>
                         </Border>
                     </DockPanel>
@@ -187,7 +187,7 @@
                         <DockPanel>
                             <TextBlock Style="{StaticResource Icon}" Text="&#xE945;" Width="28" HorizontalAlignment="Left" Foreground="#C4B5FD"/>
                             <TextBlock x:Name="CountMuse" DockPanel.Dock="Right" FontSize="12.5" Foreground="{DynamicResource SidebarTextDim}" VerticalAlignment="Center"/>
-                            <TextBlock Text="Added by Muse" VerticalAlignment="Center"/>
+                            <TextBlock Text="Added by AI" VerticalAlignment="Center"/>
                         </DockPanel>
                     </RadioButton>
                     <RadioButton x:Name="NavTasks" Style="{StaticResource SidebarNav}" GroupName="nav" Tag="tasks" Click="Nav_Click">

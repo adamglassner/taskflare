@@ -39,7 +39,7 @@ public partial class MainWindow : Window
         ListsHost.ItemsSource = TaskStore.Lists;
 
         TaskStore.Changed += OnStoreChanged;
-        TaskStore.MuseAdded += OnMuseAdded;
+        TaskStore.AiAdded += OnAiAdded;
         ReminderService.ReminderDue += OnReminder;
         ThemeManager.ThemeChanged += () => { if (_selected != null) RenderDetail(); };
         TrayService.OpenRequested += () => Dispatcher.InvokeAsync(BringToFront);
@@ -198,7 +198,7 @@ public partial class MainWindow : Window
             "myday" => all.Where(t => t.InMyDay || (t.Due.HasValue && t.Due.Value.Date <= today && (!t.Completed || t.CompletedAt?.Date == today))),
             "important" => all.Where(t => t.Important),
             "planned" => all.Where(t => t.Due.HasValue),
-            "muse" => all.Where(t => t.FromMuse),
+            "muse" => all.Where(t => t.FromAi),
             "tasks" => all.Where(t => t.ListId == null),
             "list" => all.Where(t => t.ListId == _activeList?.Id),
             "search" => all.Where(t => Matches(t, _search)),
@@ -350,10 +350,10 @@ public partial class MainWindow : Window
                 emptyText = "Tasks with due dates show up here, grouped by when they're due.";
                 break;
             case "muse":
-                title = "Added by Muse"; glyph = "";
-                sub = MuseServer.IsRunning ? $"{openCount} open · Muse connector is on" : $"{openCount} open · Muse connector is off (Settings › Muse AI)";
-                emptyGlyph = ""; emptyTitle = "Let Muse add tasks for you";
-                emptyText = "Turn on the Muse connector in Settings, then ask Muse things like \"add milk to my shopping list in Taskflare\".";
+                title = "Added by AI"; glyph = "";
+                sub = MuseServer.IsRunning ? $"{openCount} open · AI connector is on" : $"{openCount} open · AI connector is off (Settings › AI assistants)";
+                emptyGlyph = ""; emptyTitle = "Let your AI assistant add tasks";
+                emptyText = "Connect Claude, ChatGPT, Gemini, Grok, Muse or Siri in Settings › AI assistants, then ask things like \"add milk to my Shopping list in Taskflare\".";
                 canAdd = false;
                 break;
             case "tasks":
@@ -403,7 +403,7 @@ public partial class MainWindow : Window
         CountMyDay.Text = C(open.Count(t => t.InMyDay || (t.Due.HasValue && t.Due.Value.Date <= today)));
         CountImportant.Text = C(open.Count(t => t.Important));
         CountPlanned.Text = C(open.Count(t => t.Due.HasValue));
-        CountMuse.Text = C(open.Count(t => t.FromMuse));
+        CountMuse.Text = C(open.Count(t => t.FromAi));
         CountTasks.Text = C(open.Count(t => t.ListId == null));
     }
 
@@ -592,8 +592,7 @@ public partial class MainWindow : Window
     public void Complete(TaskItem t, bool done)
     {
         TaskStore.SetCompleted(t, done);
-        if (done && SettingsService.Current.PlaySound && !App.IsSelfTest)
-            try { SystemSounds.Asterisk.Play(); } catch { }
+        if (done && !App.IsSelfTest) SoundService.PlayComplete();
     }
 
     private void Star_Click(object sender, RoutedEventArgs e)
@@ -1240,11 +1239,11 @@ public partial class MainWindow : Window
         }, 0, sound: true);
     }
 
-    private void OnMuseAdded(TaskItem t)
+    private void OnAiAdded(TaskItem t)
     {
         if (!SettingsService.Current.MuseNotify || App.IsSelfTest) return;
         var detail = t.ListName + (t.HasDue ? " · due " + t.DueText.ToLowerInvariantFirst() : "");
-        Toast.Pop("Muse added a task", t.Title, detail, "", "MuseBadge", new (string, Action, bool)[]
+        Toast.Pop(t.AddedByName + " added a task", t.Title, detail, "", "MuseBadge", new (string, Action, bool)[]
         {
             ("Open", () => { BringToFront(); Reveal(t); }, true),
         }, 8);
@@ -1308,7 +1307,7 @@ public partial class MainWindow : Window
             {
                 SettingsService.Current.TrayHintShown = true;
                 SettingsService.Save();
-                Toast.Pop("Taskflare is still running", "Reminders and the Muse connector keep working",
+                Toast.Pop("Taskflare is still running", "Reminders and AI assistants keep working",
                     "Find Taskflare in the notification area by the clock. You can change this in Settings.", "", "Accent",
                     new (string, Action, bool)[] { ("Quit Taskflare", () => Quit(), false) }, 10);
             }

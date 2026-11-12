@@ -6,10 +6,10 @@ using System.Text.RegularExpressions;
 namespace Taskflare.Services;
 
 /// <summary>
-/// Muse runs in Meta's cloud, so it can't see "localhost" on your PC. This starts Cloudflare's free
+/// AI assistants run in the cloud, so they can't see "localhost" on your PC. This starts Cloudflare's free
 /// cloudflared program in "quick tunnel" mode, which gives the connector a public https address
 /// (https://something.trycloudflare.com) that forwards to Taskflare on this PC. No Cloudflare account needed.
-/// The address changes each time the tunnel starts, so Taskflare shows the current one to paste into Muse.
+/// The address changes each time the tunnel starts, so Taskflare shows the current one to paste into your assistant.
 /// </summary>
 public static class TunnelService
 {

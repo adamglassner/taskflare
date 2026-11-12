@@ -25,8 +25,8 @@ public static class TaskStore
     /// <summary>Raised after any change (on the UI thread).</summary>
     public static event Action Changed;
 
-    /// <summary>Raised when Muse adds a task.</summary>
-    public static event Action<TaskItem> MuseAdded;
+    /// <summary>Raised when an AI assistant adds a task.</summary>
+    public static event Action<TaskItem> AiAdded;
 
     private static DispatcherTimer _saveTimer;
     private static bool _dirty;
@@ -209,9 +209,10 @@ public static class TaskStore
 
     public static TaskItem Find(string id) => string.IsNullOrEmpty(id) ? null : Data.Tasks.FirstOrDefault(t => t.Id == id && !t.Deleted);
 
-    public static TaskItem Add(TaskItem t, bool fromMuse = false)
+    /// <param name="aiSource">The assistant adding it ("claude", "chatgpt"…), or null when you add it.</param>
+    public static TaskItem Add(TaskItem t, string aiSource = null)
     {
-        if (fromMuse) t.Source = "muse";
+        if (aiSource != null) t.Source = AiNames.Normalize(aiSource);
         t.Title = (t.Title ?? "").Trim();
         var live = Tasks.ToList();
         if (SettingsService.Current.AddToTop)
@@ -224,7 +225,7 @@ public static class TaskStore
         Decorate(t);
         Data.Tasks.Add(t);
         Commit();
-        if (fromMuse) MuseAdded?.Invoke(t);
+        if (aiSource != null) AiAdded?.Invoke(t);
         return t;
     }
 

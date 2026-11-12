@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.1.0 (2026-11-11)
+
+- Works with more AI assistants: Claude, ChatGPT, Gemini, Grok and Meta's Muse can connect as a custom connector, and Siri can add tasks through an Apple Shortcut. Settings › AI assistants has step-by-step setup for each one, with its own link.
+- Tasks added by an assistant now say which one added them (Claude, ChatGPT, Siri…), and the sidebar list is now "Added by AI".
+- A sound when you check off a task, with four to choose from (Chime, Ding, Pop, Bubble). Turn it on or off in Settings › General.
+- Alexa isn't supported yet: Amazon doesn't let people connect their own apps to Alexa+.
+
 ## 1.0.0 (2026-11-11)
 
 First release of Taskflare, a free and open-source to-do list for Windows 10 and 11 by Bytehawk Studio.

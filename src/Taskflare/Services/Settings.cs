@@ -29,7 +29,11 @@ public sealed class AppSettings
     public bool SmartQuickAdd { get; set; } = true;
     public bool AddToTop { get; set; } = false;
     public bool ConfirmDelete { get; set; } = true;
+    /// <summary>Sound for reminders.</summary>
     public bool PlaySound { get; set; } = true;
+    /// <summary>Sound when you tick off a task.</summary>
+    public bool CompleteSound { get; set; } = true;
+    public string CompleteSoundName { get; set; } = "Chime";
     public bool RemindAtDueTime { get; set; } = true;
     public bool KeepRunningInTray { get; set; } = true;
     public bool StartWithWindows { get; set; } = false;
@@ -38,7 +42,7 @@ public sealed class AppSettings
     public Dictionary<string, bool> ShowCompleted { get; set; } = new();
     public string LastView { get; set; } = "myday";
 
-    // ---- Muse connector ----
+    // ---- AI connector (named "Muse" in 1.0; the names are kept so settings carry over) ----
     public bool MuseEnabled { get; set; } = false;
     public int MusePort { get; set; } = 47811;
     public string MuseKey { get; set; } = "";
@@ -128,5 +132,6 @@ public static class SettingsService
         if (double.IsNaN(s.WinHeight) || s.WinHeight < 460) s.WinHeight = 720;
         s.LastView ??= "myday";
         s.Accent ??= "Blue";
+        s.CompleteSoundName ??= "Chime";
     }
 }

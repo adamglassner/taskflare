@@ -5,7 +5,7 @@ Microsoft To Do (My Day, Important, Planned, steps, a details pane) and Todoist 
 dates, `#lists` and priorities), in Light or Dark mode. Add as many tasks and lists as you like. No account,
 no subscription, nothing locked behind a paywall.
 
-It also has a **Muse AI connector**, so Meta's Muse can add tasks for you ("add eggs and milk to my Shopping list in Taskflare").
+It also works with **AI assistants**: Claude, ChatGPT, Gemini, Grok and Meta's Muse can add and read your tasks, and Siri can add them through an Apple Shortcut ("add eggs and milk to my Shopping list in Taskflare").
 
 A mobile version that syncs with this one is planned.
 
@@ -26,7 +26,8 @@ A mobile version that syncs with this one is planned.
 | **Quick add** | Type naturally and press Enter. Chips under the box show what Taskflare understood. |
 | **Details** | Steps, My Day, reminder, due date and time, repeat, priority, list, labels and notes. |
 | **Reminders** | Pop up in the corner of the screen with Complete and Snooze. Taskflare keeps running in the notification area when you close it (you can turn that off). |
-| **Muse AI** | Muse can add, read and complete tasks (see below). Tasks it adds get a *Muse* badge and their own *Added by Muse* list. |
+| **AI assistants** | Claude, ChatGPT, Gemini, Grok, Muse and Siri can add, read and complete tasks (see below). Tasks they add get a badge with the assistant's name and appear in *Added by AI*. |
+| **Sounds** | A little sound when you check off a task (Chime, Ding, Pop or Bubble), which you can turn off. |
 | **Your data** | Saved in `%APPDATA%\Taskflare\tasks.json`, with a daily backup in `backups\`. Export and import from Settings. |
 
 ### Quick add cheat sheet
@@ -47,24 +48,33 @@ Example: `Call mom tomorrow at 5pm #Personal p1`. Turn this off in Settings if y
 
 `Ctrl+N` new task · `Ctrl+F` search · `Ctrl+D` complete the selected task · `Space` complete · `Delete` delete · `Enter` edit the title · `Esc` close the details pane
 
-## Muse AI connector
+## AI assistants
 
-Muse is Meta's personal AI agent. Taskflare includes a small web server, off by default, that lets Muse (or any AI agent) work with your tasks:
+Taskflare includes a small web server, off by default, that lets AI assistants work with your tasks. Set it up in **Settings › AI assistants**:
 
-1. **Settings › Muse AI › Turn on the Muse connector.** It listens on this PC only (`http://localhost:47811`).
-2. **Start the public link.** Muse runs in Meta's cloud, so it can't reach `localhost`. Taskflare downloads Cloudflare's free
+1. **Turn on the AI connector.** It listens on this PC only (`http://localhost:47811`).
+2. **Start the public link.** Assistants run in the cloud, so they can't reach `localhost`. Taskflare downloads Cloudflare's free
    `cloudflared` and starts a *quick tunnel*, which gives you a private `https://….trycloudflare.com` address. No Cloudflare
    account needed. The address changes each time the tunnel starts.
-3. **Add it to Muse.** In Muse: *Settings › Connectors › Add custom connector*, and paste the connector link
-   (`https://…/mcp/<your secret key>`). If your Muse doesn't offer that, click **Copy setup message for Muse** and send it to Muse in a chat;
-   Muse can build its own connector from Taskflare's API.
-4. Ask away: *"Add 'book flights' to my Work list for Friday, high priority"*, *"What's on my to-do list today?"*, *"Tick off buy milk"*.
+3. **Connect your assistant.** Each assistant gets its own link (`https://…/mcp/<secret key>/<assistant>`), so Taskflare can show who added each task.
 
-You choose whether Muse may complete, change and delete tasks, or only add and read them.
+| Assistant | How | Plans |
+|---|---|---|
+| **Claude** | Settings › Connectors › *Add custom connector*, paste the link. Works in the Claude apps on your phone too. | All plans (Free allows one custom connector) |
+| **ChatGPT** | Turn on *Developer mode* (Settings › Apps & Connectors › Advanced), create a connector with the link and *No authentication*. | Paid plans with Developer mode |
+| **Gemini** | gemini.google.com › Settings › Connected Apps › *Add a custom app*, paste the link. | Google AI Ultra (Gemini Spark), personal accounts, English |
+| **Grok** | grok.com/connectors › *New Connector* › *Custom*, paste the link. | Paid Grok plans |
+| **Muse** | Settings › Connectors › *Add custom connector* if your Muse has it; otherwise send Muse the setup message from Taskflare. | — |
+| **Siri** | An Apple Shortcut: *Dictate Text* → *Get Contents of URL* (POST, JSON body `{"text": Dictated Text}`) to the Siri link. Say "Hey Siri, add to Taskflare". | iPhone, iPad, Mac |
+| **Alexa** | Not yet. Amazon only lets developers connect apps to Alexa+ through certified add-ons. | — |
+| **Others** | Any app that takes an MCP / custom connector link (Perplexity, Le Chat, Copilot Studio, Cursor…), or the JSON API. | — |
+
+Then ask away: *"Add 'book flights' to my Work list for Friday, high priority"*, *"What's on my to-do list today?"*, *"Tick off buy milk"*.
+You choose whether assistants may complete, change and delete tasks, or only add and read them.
 
 ### For developers
 
-**MCP** (streamable HTTP, JSON responses): `POST /mcp/<key>`. Tools: `add_task`, `add_tasks`, `quick_add`, `list_tasks`,
+**MCP** (streamable HTTP, JSON responses): `POST /mcp/<key>` or `POST /mcp/<key>/<assistant>` (claude, chatgpt, gemini, grok, muse…). Without the assistant part, Taskflare works it out from the client's name. Tools: `add_task`, `add_tasks`, `quick_add`, `list_tasks`,
 `list_lists`, `complete_task`, `update_task`, `delete_task`, `create_list`.
 
 **REST** (JSON): open `GET /api/<key>` for the full list. The main ones:
@@ -79,7 +89,7 @@ DELETE /api/<key>/tasks/<id>
 GET    /api/<key>/lists
 ```
 
-The key can also be sent as `Authorization: Bearer <key>` (then use `/mcp` and `/api/...` without it in the path).
+Add `?via=<assistant>` to REST calls to label the tasks they add. The key can also be sent as `Authorization: Bearer <key>` (then use `/mcp` and `/api/...` without it in the path).
 Make a new key in Settings at any time; the old link stops working.
 
 ## Building

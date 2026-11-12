@@ -10,7 +10,7 @@ public sealed class ToolError : Exception
 }
 
 /// <summary>
-/// The actions Muse (or any AI agent) can take on Taskflare. Used by both the MCP endpoint and the REST API.
+/// The actions an AI assistant (Claude, ChatGPT, Gemini, Grok, Muse…) can take on Taskflare. Used by both the MCP endpoint and the REST API.
 /// Always called on the UI thread.
 /// </summary>
 public static class MuseTools
@@ -97,7 +97,7 @@ public static class MuseTools
         "inputSchema": {
           "type": "object",
           "properties": {
-            "view": { "type": "string", "enum": ["all", "my_day", "important", "planned", "overdue", "today", "completed", "muse"], "description": "Which tasks. 'all' (default) is every open task." },
+            "view": { "type": "string", "enum": ["all", "my_day", "important", "planned", "overdue", "today", "completed", "ai"], "description": "Which tasks. 'all' (default) is every open task; 'ai' is tasks added by AI assistants." },
             "list": { "type": "string", "description": "Only tasks in this list." },
             "search": { "type": "string", "description": "Only tasks whose title or notes contain this text." },
             "limit": { "type": "integer", "description": "Maximum number to return (default 100)." }
@@ -172,10 +172,14 @@ public static class MuseTools
     ]
     """;
 
+    [ThreadStatic] private static string _source;
+
     private static readonly HashSet<string> EditTools = new() { "complete_task", "update_task", "delete_task" };
 
-    public static JsonNode Execute(string name, JsonObject args)
+    /// <param name="source">Which assistant is calling ("claude", "chatgpt"…); tasks it adds are labelled with it.</param>
+    public static JsonNode Execute(string name, JsonObject args, string source = "ai")
     {
+        _source = AiNames.Normalize(source);
         args ??= new JsonObject();
         if (EditTools.Contains(name) && !SettingsService.Current.MuseAllowEdits)
             throw new ToolError("The user has only allowed adding and reading tasks. Changing, completing and deleting are turned off in Taskflare's settings.");
@@ -206,7 +210,7 @@ public static class MuseTools
         ApplyFields(t, a, now, Str(a, "list") ?? defaultList);
         foreach (var s in Strings(a, "steps")) t.Steps.Add(new TaskStep { Title = s });
         foreach (var l in Strings(a, "labels")) t.Labels.Add(l.TrimStart('@'));
-        return TaskStore.Add(t, fromMuse: true);
+        return TaskStore.Add(t, _source ?? "ai");
     }
 
     private static JsonNode AddTasks(JsonObject a)
@@ -241,7 +245,7 @@ public static class MuseTools
             ListId = p.List?.Id,
             Labels = p.Labels,
         };
-        return TaskJson(TaskStore.Add(t, fromMuse: true));
+        return TaskJson(TaskStore.Add(t, _source ?? "ai"));
     }
 
     private static JsonNode ListTasks(JsonObject a)
@@ -262,7 +266,7 @@ public static class MuseTools
             "planned" => q.Where(t => !t.Completed && t.Due.HasValue).OrderBy(t => t.DueAt),
             "overdue" => q.Where(t => t.IsOverdue).OrderBy(t => t.DueAt),
             "today" => q.Where(t => !t.Completed && t.Due.HasValue && t.Due.Value.Date <= today).OrderBy(t => t.DueAt),
-            "muse" => q.Where(t => t.FromMuse).OrderByDescending(t => t.CreatedAt),
+            "muse" or "ai" or "added_by_ai" => q.Where(t => t.FromAi).OrderByDescending(t => t.CreatedAt),
             _ => q.Where(t => !t.Completed).OrderBy(t => t.Order),
         };
         if (!string.IsNullOrWhiteSpace(listName))
@@ -464,7 +468,7 @@ public static class MuseTools
             ["in_my_day"] = t.InMyDay,
             ["steps"] = steps,
             ["labels"] = labels,
-            ["added_by"] = t.FromMuse ? "muse" : "user",
+            ["added_by"] = t.FromAi ? t.Source : "user",
             ["created_at"] = t.CreatedAt.ToLocalTime().ToString("yyyy-MM-ddTHH:mm"),
         };
     }

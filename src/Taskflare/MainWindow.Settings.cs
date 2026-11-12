@@ -10,7 +10,7 @@ using Taskflare.Views;
 
 namespace Taskflare;
 
-/// <summary>The Settings page: appearance, behaviour, the Muse AI connector, your data and About.</summary>
+/// <summary>The Settings page: appearance, behaviour, AI assistants, your data and About.</summary>
 public partial class MainWindow
 {
     private StackPanel _museCard;
@@ -76,10 +76,27 @@ public partial class MainWindow
             s.SmartQuickAdd, v => s.SmartQuickAdd = v));
         general.Children.Add(Switch("Add new tasks to the top", null, s.AddToTop, v => s.AddToTop = v));
         general.Children.Add(Switch("Ask before deleting a task", null, s.ConfirmDelete, v => s.ConfirmDelete = v));
-        general.Children.Add(Switch("Play a sound for reminders and finished tasks", null, s.PlaySound, v => s.PlaySound = v));
+        general.Children.Add(Switch("Play a sound when I check off a task", null, s.CompleteSound, v => { s.CompleteSound = v; BuildSettings(); }));
+        if (s.CompleteSound)
+        {
+            var sounds = new WrapPanel { Margin = new Thickness(0, 0, 0, 6) };
+            var lbl = Ui.Text("Sound", "TextSecondary", 13);
+            lbl.Margin = new Thickness(0, 6, 10, 0);
+            sounds.Children.Add(lbl);
+            foreach (var name in SoundService.Names)
+            {
+                var rb = new RadioButton { Content = name, GroupName = "sound", IsChecked = s.CompleteSoundName == name, Margin = new Thickness(0, 4, 18, 4) };
+                var n = name;
+                rb.Checked += (_, _) => { s.CompleteSoundName = n; SettingsService.Save(); SoundService.Play(n); };
+                sounds.Children.Add(rb);
+            }
+            sounds.Children.Add(Btn("Play", "\uE768", () => SoundService.Play(s.CompleteSoundName)));
+            general.Children.Add(sounds);
+        }
+        general.Children.Add(Switch("Play a sound for reminders", null, s.PlaySound, v => s.PlaySound = v));
         general.Children.Add(Switch("Remind me at the due time when a task has one", null, s.RemindAtDueTime, v => s.RemindAtDueTime = v));
         general.Children.Add(Switch("Keep running in the notification area when I close the window",
-            "So reminders pop up and Muse can still add tasks.", s.KeepRunningInTray, v =>
+            "So reminders pop up and AI assistants can still add tasks.", s.KeepRunningInTray, v =>
             {
                 s.KeepRunningInTray = v;
                 if (v) TrayService.Show(); else TrayService.Hide();
@@ -88,8 +105,8 @@ public partial class MainWindow
             s.StartWithWindows, v => { s.StartWithWindows = v; StartupService.Apply(v); }));
         host.Children.Add(Wrap(general));
 
-        // ---------- Muse ----------
-        host.Children.Add(Section("Muse AI"));
+        // ---------- AI assistants ----------
+        host.Children.Add(Section("AI assistants"));
         _museCard = Card();
         host.Children.Add(Wrap(_museCard));
         RefreshMuseCard();
@@ -155,7 +172,50 @@ public partial class MainWindow
         host.Children.Add(Wrap(about));
     }
 
-    /// <summary>The Muse AI card. Rebuilt when the connector or tunnel status changes.</summary>
+    private string _aiPick = "claude";
+
+    /// <summary>One assistant's set-up steps for the AI assistants card.</summary>
+    private sealed record AiGuide(string Id, string Name, string Steps, string Note, bool Works = true, bool UsesApi = false);
+
+    private static readonly AiGuide[] AiGuides =
+    {
+        new("claude", "Claude",
+            "In Claude (claude.ai or the Claude desktop app) open Settings › Connectors, choose Add custom connector, name it Taskflare and paste the link below. Leave the OAuth settings empty. " +
+            "Once it's added it also works in the Claude phone apps. Then just ask: \"add call the dentist to my Personal list in Taskflare\".",
+            "Works on every Claude plan (the Free plan allows one custom connector)."),
+        new("chatgpt", "ChatGPT",
+            "In ChatGPT on the web, turn on Developer mode (Settings › Apps & Connectors › Advanced settings). Then create a connector, name it Taskflare, paste the link below, " +
+            "choose No authentication and confirm you trust it. In a chat, pick Taskflare from the tools menu.",
+            "Needs a paid ChatGPT plan with Developer mode. OpenAI limits which plans can add or change things through custom connectors, so check yours."),
+        new("gemini", "Gemini",
+            "On gemini.google.com open Settings › Connected Apps, choose Add a custom app under Custom apps and paste the link below, then approve the connection. It then shows in the Gemini phone app too.",
+            "Google only offers custom apps on the Google AI Ultra plan (Gemini Spark), for personal accounts, in English, with Keep Activity turned on."),
+        new("grok", "Grok",
+            "Go to grok.com/connectors (or Settings › Connectors in the Grok app), click New Connector, choose Custom, name it Taskflare and paste the link below.",
+            "Custom connectors are on Grok's paid plans."),
+        new("muse", "Muse",
+            "If Muse shows Settings › Connectors › Add custom connector, paste the link below. If it doesn't have that yet, send Muse the setup message (button below) and it can use Taskflare's API, " +
+            "or add the link to Muse Code's MCP servers.",
+            "Meta hasn't opened custom connectors to everyone in the Muse app yet."),
+        new("siri", "Siri",
+            "Make an Apple Shortcut on your iPhone, iPad or Mac:\n" +
+            "1.  Open Shortcuts, tap + and name the shortcut \"Add to Taskflare\".\n" +
+            "2.  Add the action Dictate Text.\n" +
+            "3.  Add Get Contents of URL and paste the Siri link below. Tap the arrow: set Method to POST and Request Body to JSON, then add a Text field called text and set it to Dictated Text.\n" +
+            "4.  (Optional) Add Show Result so Siri reads back what was added.\n" +
+            "Then say \"Hey Siri, add to Taskflare\" and say the task, like \"call mom tomorrow at 5pm\". Dates, times, #lists and p1 work just like in the add box.",
+            "Your PC has to be on with Taskflare running and the public link on.", UsesApi: true),
+        new("alexa", "Alexa",
+            "Alexa can't connect to Taskflare yet. Amazon only lets developers plug apps into Alexa+ through add-ons built with Amazon's developer tools and certified by Amazon, " +
+            "so there's no link you can paste. Taskflare will add Alexa if Amazon opens this up.",
+            "Until then, use Siri, or ask one of the other assistants.", Works: false),
+        new("ai", "Other",
+            "Most AI apps that take an \"MCP\" or \"custom connector\" link can use the link below, for example Perplexity, Le Chat, Copilot Studio, Cursor or Claude Code. " +
+            "Apps and automations that call web APIs (Zapier, IFTTT, scripts) can use the API link instead; open it in a browser to see how it works.",
+            "Use the secret key only with tools you trust."),
+    };
+
+    /// <summary>The AI assistants card. Rebuilt when the connector or tunnel status changes.</summary>
     private void RefreshMuseCard()
     {
         if (_museCard == null || SettingsPage.Visibility != Visibility.Visible && _view != "settings") { if (_view == "muse") RefreshView(); return; }
@@ -163,10 +223,11 @@ public partial class MainWindow
         c.Children.Clear();
         var s = SettingsService.Current;
 
-        c.Children.Add(Ui.Text("Let Meta's Muse add tasks for you. Turn on the connector, then add Taskflare to Muse as a custom connector. " +
-                               "After that you can say things like \"add eggs and milk to my Shopping list in Taskflare\" or \"what's on my to-do list today?\".",
+        c.Children.Add(Ui.Text("Let your AI assistant add tasks for you: Claude, ChatGPT, Gemini, Grok, Meta's Muse, or Siri through an Apple Shortcut. " +
+                               "Turn on the connector, give it a public link, then add Taskflare to your assistant. After that you can say things like " +
+                               "\"add eggs and milk to my Shopping list in Taskflare\" or \"what's on my to-do list today?\". Tasks it adds show which assistant added them.",
                                "TextSecondary", 13));
-        c.Children.Add(Switch("Turn on the Muse connector", null, s.MuseEnabled, async v =>
+        c.Children.Add(Switch("Turn on the AI connector", null, s.MuseEnabled, async v =>
         {
             s.MuseEnabled = v;
             SettingsService.Save();
@@ -174,120 +235,151 @@ public partial class MainWindow
             RefreshMuseCard();
         }, save: false));
 
-        if (s.MuseEnabled)
+        if (!s.MuseEnabled) return;
+
+        // Status
+        var status = MuseServer.IsRunning
+            ? $"Running on this PC at {MuseServer.LocalBase}" + (MuseServer.RequestCount > 0 ? $" · {MuseServer.RequestCount} request{(MuseServer.RequestCount == 1 ? "" : "s")}, last {MuseServer.LastRequest:t}" : " · waiting for an assistant")
+            : MuseServer.Error ?? "Starting…";
+        var st = Ui.Text(status, MuseServer.IsRunning ? "Success" : MuseServer.Error != null ? "Danger" : "TextSecondary", 13);
+        st.Margin = new Thickness(0, 4, 0, 8);
+        c.Children.Add(st);
+
+        // ---- Step 1: public link ----
+        c.Children.Add(Step("1", "Give the connector a public link",
+            "AI assistants run in the cloud, so they can't reach your PC directly. Taskflare uses Cloudflare's free quick tunnel (cloudflared) " +
+            "to give it a private https link. No account is needed. The link changes each time the tunnel starts, so update it in your assistant if it changes."));
+        var tunnelRow = new WrapPanel { Margin = new Thickness(28, 6, 0, 0) };
+        var exe = TunnelService.Find();
+        if (TunnelService.IsDownloading)
+            tunnelRow.Children.Add(Ui.Text("Downloading cloudflared…", "TextSecondary", 13));
+        else if (exe == null)
+            tunnelRow.Children.Add(Btn("Download cloudflared (free, from Cloudflare)", "\uE896", async () =>
+            {
+                var path = await TunnelService.DownloadAsync();
+                if (path != null && MuseServer.IsRunning) TunnelService.Start(s.MusePort);
+                RefreshMuseCard();
+            }, accent: true));
+        else if (TunnelService.IsRunning)
+            tunnelRow.Children.Add(Btn("Stop public link", "\uE71A", () => { TunnelService.Stop(); RefreshMuseCard(); }));
+        else
+            tunnelRow.Children.Add(Btn("Start public link", "\uE768", () => { TunnelService.Start(s.MusePort); RefreshMuseCard(); }, accent: true, enabled: MuseServer.IsRunning));
+        c.Children.Add(tunnelRow);
+        var ts = Ui.Text(TunnelService.PublicUrl != null ? "Public link: " + TunnelService.PublicUrl : TunnelService.Status, TunnelService.PublicUrl != null ? "Success" : "TextSecondary", 12.5);
+        ts.Margin = new Thickness(28, 6, 0, 0);
+        if (TunnelService.PublicUrl != null || TunnelService.Status != "Off") c.Children.Add(ts);
+        var auto = Switch("Start the public link whenever Taskflare starts", null, s.MuseAutoTunnel, v => s.MuseAutoTunnel = v);
+        auto.Margin = new Thickness(28, 6, 0, 6);
+        c.Children.Add(auto);
+
+        // ---- Step 2: pick an assistant ----
+        c.Children.Add(Step("2", "Connect your assistant", "Pick yours to see how. Each one gets its own link, so Taskflare knows who added what."));
+        var picker = new WrapPanel { Margin = new Thickness(28, 8, 0, 0) };
+        foreach (var g in AiGuides)
         {
-            // Status
-            var status = MuseServer.IsRunning
-                ? $"Running on this PC at {MuseServer.LocalBase}" + (MuseServer.RequestCount > 0 ? $" · {MuseServer.RequestCount} request{(MuseServer.RequestCount == 1 ? "" : "s")}, last {MuseServer.LastRequest:t}" : " · waiting for Muse")
-                : MuseServer.Error ?? "Starting…";
-            var st = Ui.Text(status, MuseServer.IsRunning ? "Success" : MuseServer.Error != null ? "Danger" : "TextSecondary", 13);
-            st.Margin = new Thickness(0, 4, 0, 8);
-            c.Children.Add(st);
+            var tb = new System.Windows.Controls.Primitives.ToggleButton
+            {
+                Content = g.Name,
+                IsChecked = g.Id == _aiPick,
+                Style = Ui.S("FlatToggle"),
+                Padding = new Thickness(12, 5, 12, 5),
+                Margin = new Thickness(0, 0, 6, 6),
+                FontSize = 13.5,
+                MinWidth = 64,
+            };
+            var id = g.Id;
+            tb.Click += (_, _) => { _aiPick = id; RefreshMuseCard(); };
+            picker.Children.Add(tb);
+        }
+        c.Children.Add(picker);
 
-            // Step 1: public link
-            c.Children.Add(Step("1", "Give the connector a public link",
-                "Muse runs in Meta's cloud, so it can't reach your PC directly. Taskflare uses Cloudflare's free quick tunnel (cloudflared) " +
-                "to give it a private https link. No account is needed. The link changes each time the tunnel starts, so paste the new one into Muse if it changes."));
-            var tunnelRow = new WrapPanel { Margin = new Thickness(28, 6, 0, 0) };
-            var exe = TunnelService.Find();
-            if (TunnelService.IsDownloading)
-            {
-                tunnelRow.Children.Add(Ui.Text("Downloading cloudflared…", "TextSecondary", 13));
-            }
-            else if (exe == null)
-            {
-                tunnelRow.Children.Add(Btn("Download cloudflared (free, from Cloudflare)", "", async () =>
-                {
-                    var path = await TunnelService.DownloadAsync();
-                    if (path != null && MuseServer.IsRunning) TunnelService.Start(s.MusePort);
-                    RefreshMuseCard();
-                }, accent: true));
-            }
-            else if (TunnelService.IsRunning)
-            {
-                tunnelRow.Children.Add(Btn("Stop public link", "", () => { TunnelService.Stop(); RefreshMuseCard(); }));
-            }
-            else
-            {
-                tunnelRow.Children.Add(Btn("Start public link", "", () => { TunnelService.Start(s.MusePort); RefreshMuseCard(); }, accent: true, enabled: MuseServer.IsRunning));
-            }
-            c.Children.Add(tunnelRow);
-            var ts = Ui.Text(TunnelService.PublicUrl != null ? "Public link: " + TunnelService.PublicUrl : TunnelService.Status, TunnelService.PublicUrl != null ? "Success" : "TextSecondary", 12.5);
-            ts.Margin = new Thickness(28, 6, 0, 0);
-            if (TunnelService.PublicUrl != null || TunnelService.Status != "Off") c.Children.Add(ts);
-            var auto = Switch("Start the public link whenever Taskflare starts", null, s.MuseAutoTunnel, v => s.MuseAutoTunnel = v);
-            auto.Margin = new Thickness(28, 6, 0, 6);
-            c.Children.Add(auto);
+        var guide = AiGuides.FirstOrDefault(x => x.Id == _aiPick) ?? AiGuides[0];
+        var baseUrl = TunnelService.PublicUrl ?? MuseServer.LocalBase;
+        var mcpUrl = $"{baseUrl}/mcp/{s.MuseKey}/{guide.Id}";
+        var apiUrl = $"{baseUrl}/api/{s.MuseKey}?via={guide.Id}";
+        var siriUrl = $"{baseUrl}/api/{s.MuseKey}/quick-add?via=siri";
 
-            // Step 2: add to Muse
-            c.Children.Add(Step("2", "Add Taskflare to Muse",
-                "In Muse, open Settings › Connectors › Add custom connector and paste the connector link. " +
-                "If your Muse doesn't have that option, use \"Copy setup message for Muse\" and send it to Muse in a chat instead; Muse can build its own connector from Taskflare's API."));
-            var baseUrl = TunnelService.PublicUrl ?? MuseServer.LocalBase;
-            var mcpUrl = $"{baseUrl}/mcp/{s.MuseKey}";
-            var apiUrl = $"{baseUrl}/api/{s.MuseKey}";
-            var linkBox = new TextBox { Style = Ui.S("FieldBox"), Text = mcpUrl, IsReadOnly = true, Margin = new Thickness(28, 8, 0, 0), FontFamily = new FontFamily("Cascadia Mono, Consolas"), FontSize = 12.5 };
-            c.Children.Add(linkBox);
+        var box = new Border { Margin = new Thickness(28, 4, 0, 0), Padding = new Thickness(14, 12, 14, 12), CornerRadius = new CornerRadius(8), BorderThickness = new Thickness(1) };
+        box.SetResourceReference(Border.BackgroundProperty, "PaneBg");
+        box.SetResourceReference(Border.BorderBrushProperty, "Divider");
+        var inner = new StackPanel();
+        box.Child = inner;
+        inner.Children.Add(Ui.Text(guide.Steps, "Text", 13));
+        var note = Ui.Text(guide.Note, guide.Works ? "TextSecondary" : "Danger", 12.5);
+        note.Margin = new Thickness(0, 6, 0, 0);
+        inner.Children.Add(note);
+
+        if (guide.Works)
+        {
+            var link = guide.UsesApi ? siriUrl : mcpUrl;
+            var linkBox = new TextBox { Style = Ui.S("FieldBox"), Text = link, IsReadOnly = true, Margin = new Thickness(0, 10, 0, 0), FontFamily = new FontFamily("Cascadia Mono, Consolas"), FontSize = 12.5 };
+            inner.Children.Add(linkBox);
             if (TunnelService.PublicUrl == null)
             {
-                var warn = Hint("This link only works on this PC. Start the public link above so Muse can reach it.");
-                warn.Margin = new Thickness(28, 4, 0, 0);
-                c.Children.Add(warn);
+                var warn = Hint("This link only works on this PC. Start the public link in step 1 so your assistant can reach it.");
+                warn.SetResourceReference(TextBlock.ForegroundProperty, "Warning");
+                warn.Margin = new Thickness(0, 4, 0, 0);
+                inner.Children.Add(warn);
             }
-            var copyRow = new WrapPanel { Margin = new Thickness(28, 8, 0, 0) };
-            copyRow.Children.Add(Btn("Copy connector link", "", () => CopyText(mcpUrl), accent: true));
-            copyRow.Children.Add(Btn("Copy setup message for Muse", "", () => CopyText(
-                "Please connect to my Taskflare to-do list so you can add and read my tasks. " +
-                $"It's a JSON API at {apiUrl} (open that address to read how it works; the key is already in the link). " +
-                $"If you support MCP connectors, the MCP endpoint is {mcpUrl}. " +
-                "When I ask you to remember, plan or schedule something, add it to Taskflare.")));
-            copyRow.Children.Add(Btn("Copy API link", "", () => CopyText(apiUrl)));
-            c.Children.Add(copyRow);
-
-            // Step 3: permissions
-            c.Children.Add(Step("3", "Choose what Muse may do", "Muse can always add tasks and read them (so it doesn't add duplicates)."));
-            var edits = Switch("Let Muse complete, change and delete tasks", null, s.MuseAllowEdits, v => s.MuseAllowEdits = v);
-            edits.Margin = new Thickness(28, 6, 0, 6);
-            c.Children.Add(edits);
-            var notify = Switch("Show a notification when Muse adds a task", null, s.MuseNotify, v => s.MuseNotify = v);
-            notify.Margin = new Thickness(28, 6, 0, 6);
-            c.Children.Add(notify);
-
-            // Advanced
-            var adv = Ui.Text("Advanced", "Text", 13.5, FontWeights.SemiBold);
-            adv.Margin = new Thickness(0, 14, 0, 4);
-            c.Children.Add(adv);
-            var advRow = new WrapPanel();
-            var portBox = new TextBox { Style = Ui.S("FieldBox"), Text = s.MusePort.ToString(), Width = 90, Margin = new Thickness(0, 0, 8, 0), Tag = "Port" };
-            advRow.Children.Add(Ui.Text("Port", "TextSecondary", 13));
-            ((TextBlock)advRow.Children[0]).Margin = new Thickness(0, 7, 8, 0);
-            advRow.Children.Add(portBox);
-            advRow.Children.Add(Btn("Apply", "", async () =>
+            var copyRow = new WrapPanel { Margin = new Thickness(0, 8, 0, 0) };
+            copyRow.Children.Add(Btn(guide.UsesApi ? "Copy Siri link" : "Copy connector link", "\uE8C8", () => CopyText(link), accent: true));
+            if (guide.Id is "muse" or "ai")
             {
-                if (int.TryParse(portBox.Text, out var p) && p >= 1024 && p <= 65535 && p != s.MusePort)
-                {
-                    s.MusePort = p;
-                    SettingsService.Save();
-                    bool tunnel = TunnelService.IsRunning;
-                    await StartMuseAsync();
-                    if (tunnel) TunnelService.Start(p);
-                    RefreshMuseCard();
-                }
-            }));
-            advRow.Children.Add(Btn("New secret key", "", async () =>
-            {
-                if (!Confirm.Ask(this, "Make a new secret key?", "The old connector link stops working. You'll need to paste the new link into Muse.", "Make new key", danger: false)) return;
-                s.MuseKey = AppSettings.NewKey();
-                SettingsService.Save();
-                await Task.Yield();
-                RefreshMuseCard();
-            }));
-            c.Children.Add(advRow);
-            var keyHint = Hint("The secret key in the link is what lets Muse in, so only share the link with Muse. " +
-                               "Agents that send headers can also use the key as a Bearer token.");
-            keyHint.Margin = new Thickness(0, 6, 0, 0);
-            c.Children.Add(keyHint);
+                copyRow.Children.Add(Btn("Copy setup message", "\uE8BD", () => CopyText(
+                    "Please connect to my Taskflare to-do list so you can add and read my tasks. " +
+                    $"It's a JSON API at {apiUrl} (open that address to read how it works; the key is already in the link). " +
+                    $"If you support MCP connectors, the MCP endpoint is {mcpUrl}. " +
+                    "When I ask you to remember, plan or schedule something, add it to Taskflare.")));
+                copyRow.Children.Add(Btn("Copy API link", "\uE71B", () => CopyText(apiUrl)));
+            }
+            inner.Children.Add(copyRow);
         }
+        c.Children.Add(box);
+
+        // ---- Step 3: permissions ----
+        c.Children.Add(Step("3", "Choose what assistants may do", "They can always add tasks and read them (so they don't add duplicates)."));
+        var edits = Switch("Let assistants complete, change and delete tasks", null, s.MuseAllowEdits, v => s.MuseAllowEdits = v);
+        edits.Margin = new Thickness(28, 6, 0, 6);
+        c.Children.Add(edits);
+        var notify = Switch("Show a notification when an assistant adds a task", null, s.MuseNotify, v => s.MuseNotify = v);
+        notify.Margin = new Thickness(28, 6, 0, 6);
+        c.Children.Add(notify);
+
+        // ---- Advanced ----
+        var adv = Ui.Text("Advanced", "Text", 13.5, FontWeights.SemiBold);
+        adv.Margin = new Thickness(0, 14, 0, 4);
+        c.Children.Add(adv);
+        var advRow = new WrapPanel();
+        var portLabel = Ui.Text("Port", "TextSecondary", 13);
+        portLabel.Margin = new Thickness(0, 7, 8, 0);
+        advRow.Children.Add(portLabel);
+        var portBox = new TextBox { Style = Ui.S("FieldBox"), Text = s.MusePort.ToString(), Width = 90, Margin = new Thickness(0, 0, 8, 0), Tag = "Port" };
+        advRow.Children.Add(portBox);
+        advRow.Children.Add(Btn("Apply", "\uE73E", async () =>
+        {
+            if (int.TryParse(portBox.Text, out var p) && p >= 1024 && p <= 65535 && p != s.MusePort)
+            {
+                s.MusePort = p;
+                SettingsService.Save();
+                bool tunnel = TunnelService.IsRunning;
+                await StartMuseAsync();
+                if (tunnel) TunnelService.Start(p);
+                RefreshMuseCard();
+            }
+        }));
+        advRow.Children.Add(Btn("New secret key", "\uE72C", async () =>
+        {
+            if (!Confirm.Ask(this, "Make a new secret key?", "Every assistant's link stops working. You'll need to paste the new links into your assistants.", "Make new key", danger: false)) return;
+            s.MuseKey = AppSettings.NewKey();
+            SettingsService.Save();
+            await Task.Yield();
+            RefreshMuseCard();
+        }));
+        c.Children.Add(advRow);
+        var keyHint = Hint("The secret key in the links is what lets assistants in, so only paste them into assistants you trust. " +
+                           "Tools that send headers can also use the key as a Bearer token.");
+        keyHint.Margin = new Thickness(0, 6, 0, 0);
+        c.Children.Add(keyHint);
     }
 
     // ---------- helpers ----------

@@ -7,15 +7,17 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
+using Taskflare.Models;
 
 namespace Taskflare.Services;
 
 /// <summary>
-/// The Muse connector: a small web server inside Taskflare that lets Meta's Muse AI (or any AI agent)
-/// add and read tasks. It speaks two languages:
-///   • MCP (Model Context Protocol, streamable HTTP) at  /mcp/&lt;key&gt;  — what Muse custom connectors use
+/// The AI connector: a small web server inside Taskflare that lets AI assistants (Claude, ChatGPT, Gemini, Grok,
+/// Meta's Muse, Siri through Apple Shortcuts…) add and read tasks. It speaks two languages:
+///   • MCP (Model Context Protocol, streamable HTTP) at  /mcp/&lt;key&gt;  — what custom connectors use
 ///   • a plain JSON REST API at                         /api/&lt;key&gt;/…  — for agents that build their own connector
-/// It listens on this PC only (localhost). Muse runs in Meta's cloud, so <see cref="TunnelService"/> can give it a
+/// Add ?via=claude (chatgpt, gemini, grok, muse, siri…) to the address so tasks are labelled with the assistant that added them.
+/// It listens on this PC only (localhost). The assistants run in the cloud, so <see cref="TunnelService"/> can give it a
 /// public https address through a Cloudflare quick tunnel. Every request needs the secret key.
 /// </summary>
 public static class MuseServer
@@ -31,6 +33,9 @@ public static class MuseServer
     public static event Action StatusChanged;
 
     public static string LocalBase => $"http://localhost:{Port}";
+
+    /// <summary>MCP session id → the assistant that opened it (from its clientInfo name).</summary>
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, string> Sessions = new();
 
     private static readonly string[] ProtocolVersions = { "2025-06-18", "2025-03-26", "2024-11-05" };
 
@@ -104,8 +109,8 @@ public static class MuseServer
         {
             await Text(ctx, 200, "text/html; charset=utf-8",
                 "<!doctype html><title>Taskflare</title><body style=\"font-family:Segoe UI,sans-serif;padding:2em\">" +
-                "<h2>Taskflare connector is running</h2><p>This is the connector that lets Muse add tasks to Taskflare on this PC. " +
-                "The address with your secret key is in Taskflare &rsaquo; Settings &rsaquo; Muse AI.</p></body>");
+                "<h2>Taskflare connector is running</h2><p>This is the connector that lets AI assistants add tasks to Taskflare on this PC. " +
+                "The address with your secret key is in Taskflare &rsaquo; Settings &rsaquo; AI assistants.</p></body>");
             return;
         }
         if (seg[0].Equals("health", StringComparison.OrdinalIgnoreCase))
@@ -129,7 +134,7 @@ public static class MuseServer
         else
         {
             ctx.Response.Headers["WWW-Authenticate"] = "Bearer";
-            await Json(ctx, 401, new JsonObject { ["error"] = "Missing or wrong key. Copy the connector address from Taskflare › Settings › Muse AI." });
+            await Json(ctx, 401, new JsonObject { ["error"] = "Missing or wrong key. Copy the connector address from Taskflare › Settings › AI assistants." });
             return;
         }
 
@@ -137,8 +142,11 @@ public static class MuseServer
         LastRequest = DateTime.Now;
         try { System.Windows.Application.Current?.Dispatcher.InvokeAsync(() => StatusChanged?.Invoke()); } catch { }
 
-        if (kind == "mcp") await HandleMcp(ctx, method);
-        else await HandleApi(ctx, method, rest);
+        var via = ctx.Request.Query["via"].ToString();
+        if (kind == "mcp" && rest.Length > 0) via = rest[0]; // /mcp/<key>/claude
+        if (string.IsNullOrEmpty(via)) via = ctx.Request.Headers["X-Taskflare-Via"].ToString();
+        if (kind == "mcp") await HandleMcp(ctx, method, string.IsNullOrEmpty(via) ? null : AiNames.Normalize(via));
+        else await HandleApi(ctx, method, rest, string.IsNullOrEmpty(via) ? "ai" : AiNames.Normalize(via));
     }
 
     private static string HeaderKey(HttpRequest r)
@@ -160,7 +168,7 @@ public static class MuseServer
 
     // ---------- MCP (JSON-RPC 2.0 over streamable HTTP; answers are plain JSON) ----------
 
-    private static async Task HandleMcp(HttpContext ctx, string method)
+    private static async Task HandleMcp(HttpContext ctx, string method, string via)
     {
         if (method == "GET")
         {
@@ -171,6 +179,7 @@ public static class MuseServer
         }
         if (method == "DELETE")
         {
+            Sessions.TryRemove(ctx.Request.Headers["Mcp-Session-Id"].ToString(), out _);
             ctx.Response.StatusCode = 200;
             return;
         }
@@ -192,12 +201,25 @@ public static class MuseServer
             return;
         }
 
+        var session = ctx.Request.Headers["Mcp-Session-Id"].ToString();
+        string source = via ?? (Sessions.TryGetValue(session, out var known) ? known : "ai");
+        if (body is JsonObject one && StrOf(one["method"]) == "initialize")
+        {
+            // A new session: remember who it is, from the client's name, unless the link says ?via=
+            session = Guid.NewGuid().ToString("N");
+            var client = StrOf(one["params"]?["clientInfo"]?["name"]);
+            source = via ?? AiNames.Guess(client);
+            Sessions[session] = source;
+            if (Sessions.Count > 500) Sessions.Clear();
+        }
+        if (!string.IsNullOrEmpty(session)) ctx.Response.Headers["Mcp-Session-Id"] = session;
+
         if (body is JsonArray batch)
         {
             var answers = new JsonArray();
             foreach (var item in batch)
             {
-                var a = await HandleRpc(item as JsonObject);
+                var a = await HandleRpc(item as JsonObject, source);
                 if (a != null) answers.Add(a);
             }
             if (answers.Count == 0) { ctx.Response.StatusCode = 202; return; }
@@ -205,14 +227,13 @@ public static class MuseServer
             return;
         }
 
-        var answer = await HandleRpc(body as JsonObject);
+        var answer = await HandleRpc(body as JsonObject, source);
         if (answer == null) { ctx.Response.StatusCode = 202; return; }
-        ctx.Response.Headers["Mcp-Session-Id"] = "taskflare";
         await Json(ctx, 200, answer);
     }
 
     /// <summary>Returns null for notifications (no id).</summary>
-    private static async Task<JsonNode> HandleRpc(JsonObject req)
+    private static async Task<JsonNode> HandleRpc(JsonObject req, string source)
     {
         if (req == null) return RpcError(null, -32600, "Invalid request");
         var id = req["id"];
@@ -244,7 +265,7 @@ public static class MuseServer
                 {
                     var name = (p["name"] as JsonValue)?.GetValue<string>() ?? "";
                     var args = p["arguments"] as JsonObject;
-                    var (result, error) = await RunTool(name, args?.DeepClone() as JsonObject);
+                    var (result, error) = await RunTool(name, args?.DeepClone() as JsonObject, source);
                     var text = error ?? result.ToJsonString(Pretty);
                     return Ok(id, new JsonObject
                     {
@@ -266,6 +287,8 @@ public static class MuseServer
         }
     }
 
+    private static string StrOf(JsonNode n) => n is JsonValue v && v.TryGetValue<string>(out var s) ? s : null;
+
     private static JsonObject Ok(JsonNode id, JsonNode result) =>
         new() { ["jsonrpc"] = "2.0", ["id"] = id?.DeepClone(), ["result"] = result };
 
@@ -273,13 +296,13 @@ public static class MuseServer
         new() { ["jsonrpc"] = "2.0", ["id"] = id?.DeepClone(), ["error"] = new JsonObject { ["code"] = code, ["message"] = message } };
 
     /// <summary>Runs a tool on the UI thread. Returns (result, null) or (null, error message).</summary>
-    public static async Task<(JsonNode result, string error)> RunTool(string name, JsonObject args)
+    public static async Task<(JsonNode result, string error)> RunTool(string name, JsonObject args, string source = "ai")
     {
         var dispatcher = System.Windows.Application.Current?.Dispatcher;
         if (dispatcher == null) return (null, "Taskflare is closing.");
         try
         {
-            var r = await dispatcher.InvokeAsync(() => MuseTools.Execute(name, args));
+            var r = await dispatcher.InvokeAsync(() => MuseTools.Execute(name, args, source));
             return (r, null);
         }
         catch (ToolError e)
@@ -294,7 +317,7 @@ public static class MuseServer
 
     // ---------- REST ----------
 
-    private static async Task HandleApi(HttpContext ctx, string method, string[] rest)
+    private static async Task HandleApi(HttpContext ctx, string method, string[] rest, string source)
     {
         var r = rest.Select(s => s.ToLowerInvariant()).ToArray();
         JsonObject body = null;
@@ -360,7 +383,7 @@ public static class MuseServer
             await Json(ctx, 404, new JsonObject { ["error"] = "Unknown endpoint. GET /api/<key> lists them." });
             return;
         }
-        var (result, error) = await RunTool(tool, args);
+        var (result, error) = await RunTool(tool, args, source);
         if (error != null) await Json(ctx, error.StartsWith("No task", StringComparison.Ordinal) ? 404 : 400, new JsonObject { ["error"] = error });
         else await Json(ctx, method == "POST" && tool.StartsWith("add", StringComparison.Ordinal) ? 201 : 200, result);
     }
@@ -400,6 +423,7 @@ public static class MuseServer
         POST   {{b}}/lists                     {"name": "Holiday packing", "color": "#22C55E"}
 
         MCP clients can use {{b.Replace("/api/", "/mcp/")}} instead (streamable HTTP).
+        Add ?via=claude (or chatgpt, gemini, grok, muse, siri…) to any address so the tasks you add are labelled with your name.
         """;
     }
 

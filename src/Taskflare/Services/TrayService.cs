@@ -2,7 +2,7 @@ using Forms = System.Windows.Forms;
 
 namespace Taskflare.Services;
 
-/// <summary>The Taskflare icon in the notification area (so reminders and the Muse connector keep working after you close the window).</summary>
+/// <summary>The Taskflare icon in the notification area (so reminders and the AI connector keep working after you close the window).</summary>
 public static class TrayService
 {
     private static Forms.NotifyIcon _icon;

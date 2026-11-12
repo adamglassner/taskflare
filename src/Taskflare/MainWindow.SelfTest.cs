@@ -15,7 +15,7 @@ namespace Taskflare;
 
 /// <summary>
 /// Automated end-to-end test, run by the build with:  Taskflare.exe --self-test out.txt [screenshot-folder]
-/// Checks the quick-add parser, the task store (repeats, save and reload), the Muse connector over real HTTP
+/// Checks the quick-add parser, the task store (repeats, save and reload), the AI connector over real HTTP
 /// (MCP and REST), then drives the window in Light and Dark and saves screenshots of every view.
 /// Data goes to a temporary folder, never the user's own.
 /// </summary>
@@ -192,10 +192,10 @@ public partial class MainWindow
             await Task.CompletedTask;
         });
 
-        // ---------------- Muse connector ----------------
+        // ---------------- AI connector ----------------
         int port = 48000 + Random.Shared.Next(0, 900);
         SettingsService.Current.MuseKey = "test-key-0123456789abcdef";
-        await Test("Muse connector: MCP over HTTP", async () =>
+        await Test("AI connector: MCP over HTTP", async () =>
         {
             TaskStore.Reset(new TaskData());
             await MuseServer.StartAsync(port);
@@ -203,18 +203,23 @@ public partial class MainWindow
             using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(20) };
             var mcp = $"http://localhost:{port}/mcp/{SettingsService.Current.MuseKey}";
 
-            async Task<JsonNode> Rpc(string method, JsonObject p, int id = 1)
+            string session = null;
+            async Task<JsonNode> Rpc(string method, JsonObject p, int id = 1, string url = null)
             {
                 var body = new JsonObject { ["jsonrpc"] = "2.0", ["id"] = id, ["method"] = method, ["params"] = p ?? new JsonObject() };
-                var req = new HttpRequestMessage(HttpMethod.Post, mcp) { Content = new StringContent(body.ToJsonString(), Encoding.UTF8, "application/json") };
+                var req = new HttpRequestMessage(HttpMethod.Post, url ?? mcp) { Content = new StringContent(body.ToJsonString(), Encoding.UTF8, "application/json") };
                 req.Headers.Accept.ParseAdd("application/json");
                 req.Headers.Accept.ParseAdd("text/event-stream");
+                if (session != null && url == null) req.Headers.Add("Mcp-Session-Id", session);
                 var resp = await http.SendAsync(req);
                 AreEqual(HttpStatusCode.OK, resp.StatusCode, method + " status");
+                if (method == "initialize" && resp.Headers.TryGetValues("Mcp-Session-Id", out var ids)) session = ids.FirstOrDefault();
                 return JsonNode.Parse(await resp.Content.ReadAsStringAsync());
             }
 
-            var init = await Rpc("initialize", new JsonObject { ["protocolVersion"] = "2025-06-18", ["capabilities"] = new JsonObject(), ["clientInfo"] = new JsonObject { ["name"] = "test", ["version"] = "1" } });
+            // ChatGPT names itself "openai-mcp"; Taskflare should label its tasks ChatGPT.
+            var init = await Rpc("initialize", new JsonObject { ["protocolVersion"] = "2025-06-18", ["capabilities"] = new JsonObject(), ["clientInfo"] = new JsonObject { ["name"] = "openai-mcp", ["version"] = "1" } });
+            Assert(!string.IsNullOrEmpty(session), "a session id should be returned");
             AreEqual("2025-06-18", init["result"]?["protocolVersion"]?.GetValue<string>(), "protocol version");
             AreEqual("taskflare", init["result"]?["serverInfo"]?["name"]?.GetValue<string>(), "server name");
 
@@ -232,7 +237,9 @@ public partial class MainWindow
             Assert(add["result"]?["isError"]?.GetValue<bool>() == false, "add_task error: " + add.ToJsonString());
             var milk = TaskStore.Tasks.FirstOrDefault(t => t.Title == "Buy milk");
             Assert(milk != null, "task should be in the store");
-            Assert(milk.FromMuse, "task should be marked as from Muse");
+            Assert(milk.FromAi, "task should be marked as added by an AI");
+            AreEqual("chatgpt", milk.Source, "assistant worked out from the client name");
+            AreEqual("ChatGPT", milk.AddedByName, "badge name");
             AreEqual("Groceries", milk.ListName, "list created and used");
             AreEqual(DateTime.Today.AddDays(1), milk.Due, "due tomorrow");
             AreEqual(Priority.High, milk.Priority, "priority");
@@ -263,11 +270,17 @@ public partial class MainWindow
             Assert(!milk.Deleted, "milk must still exist");
             SettingsService.Current.MuseAllowEdits = true;
 
+            // Each assistant's own link: /mcp/<key>/claude
+            var viaClaude = await Rpc("tools/call", new JsonObject { ["name"] = "add_task", ["arguments"] = new JsonObject { ["title"] = "Ask Claude about the trip" } }, 10,
+                $"http://localhost:{port}/mcp/{SettingsService.Current.MuseKey}/claude");
+            Assert(viaClaude["result"]?["isError"]?.GetValue<bool>() == false, "add via claude link");
+            AreEqual("claude", TaskStore.Tasks.First(t => t.Title == "Ask Claude about the trip").Source, "source from the link");
+
             var unknown = await Rpc("nope/nothing", null, 9);
             AreEqual(-32601, unknown["error"]?["code"]?.GetValue<int>() ?? 0, "unknown method error");
         });
 
-        await Test("Muse connector: REST API and key check", async () =>
+        await Test("AI connector: REST API, Siri and key check", async () =>
         {
             using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(20) };
             var api = $"http://localhost:{port}/api/{SettingsService.Current.MuseKey}";
@@ -290,6 +303,13 @@ public partial class MainWindow
             AreEqual(HttpStatusCode.OK, (await http.GetAsync(api + "/lists")).StatusCode, "lists");
             AreEqual(HttpStatusCode.NotFound, (await http.GetAsync(api + "/tasks/doesnotexist")).StatusCode, "missing task");
 
+            // Siri (Apple Shortcuts) posts dictated text to quick-add
+            var siri = await http.PostAsync(api + "/quick-add?via=siri", new StringContent("{\"text\":\"Call mom tomorrow at 5pm\"}", Encoding.UTF8, "application/json"));
+            AreEqual(HttpStatusCode.Created, siri.StatusCode, "siri quick-add");
+            var mom = TaskStore.Tasks.First(t => t.Title == "Call mom");
+            AreEqual("siri", mom.Source, "siri source");
+            AreEqual(new TimeSpan(17, 0, 0), mom.DueTime, "siri time");
+
             AreEqual(HttpStatusCode.Unauthorized, (await http.GetAsync($"http://localhost:{port}/api/wrong-key/tasks")).StatusCode, "wrong key");
             var bearer = new HttpRequestMessage(HttpMethod.Get, $"http://localhost:{port}/api/tasks");
             bearer.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", SettingsService.Current.MuseKey);
@@ -297,6 +317,19 @@ public partial class MainWindow
             AreEqual(HttpStatusCode.OK, (await http.GetAsync($"http://localhost:{port}/health")).StatusCode, "health");
             await MuseServer.StopAsync();
             Assert(!MuseServer.IsRunning, "server stopped");
+        });
+
+        await Test("Checkoff sounds are valid WAV files", async () =>
+        {
+            foreach (var n in SoundService.Names)
+            {
+                var wav = SoundService.Wav(n);
+                Assert(wav.Length > 2000, n + " too short");
+                AreEqual("RIFF", Encoding.ASCII.GetString(wav, 0, 4), n + " header");
+                AreEqual("WAVE", Encoding.ASCII.GetString(wav, 8, 4), n + " type");
+            }
+            AreEqual(true, SettingsService.Current.CompleteSound, "sound on by default");
+            await Task.CompletedTask;
         });
 
         // ---------------- UI ----------------
@@ -360,7 +393,13 @@ public partial class MainWindow
             await Shot("13-settings-dark");
             var sv = FindChild<System.Windows.Controls.ScrollViewer>(SettingsPage);
             sv?.ScrollToVerticalOffset(820);
-            await Shot("14-settings-muse-dark");
+            await Shot("14-settings-ai-dark");
+            _aiPick = "siri";
+            RefreshMuseCard();
+            sv = FindChild<System.Windows.Controls.ScrollViewer>(SettingsPage);
+            sv?.ScrollToVerticalOffset(1100);
+            await Shot("16-settings-siri-dark");
+            _aiPick = "claude";
             await StopMuseAsync();
 
             SettingsService.Current.Theme = ThemeMode.Light;
@@ -368,7 +407,9 @@ public partial class MainWindow
             ShowSettings();
             sv = FindChild<System.Windows.Controls.ScrollViewer>(SettingsPage);
             sv?.ScrollToVerticalOffset(820);
-            await Shot("15-settings-muse-light");
+            await Shot("15-settings-ai-light");
+            sv?.ScrollToVerticalOffset(300);
+            await Shot("17-settings-general-light");
             ShowView("myday");
         });
 
@@ -434,9 +475,10 @@ public partial class MainWindow
         T("Plan team offsite", work, today.AddDays(9), null, false, Priority.Low, myDay: false);
         T("Renew car insurance", null, today.AddDays(-2), null, true, Priority.High, myDay: false);
         var muse = T("Pick up birthday cake for Sam", shopping, today.AddDays(3), new TimeSpan(16, 30, 0), myDay: false);
-        muse.Source = "muse";
+        muse.Source = "claude";
         var muse2 = T("Call the plumber about the kitchen sink", null, null, null, myDay: false);
         muse2.Source = "muse";
+        T("Book flights for the holidays", personal, today.AddDays(5), null, false, Priority.High, myDay: false).Source = "chatgpt";
         TaskStore.Reset(d);
     }
 }

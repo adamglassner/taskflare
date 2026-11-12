@@ -82,7 +82,7 @@ public sealed class TaskItem : Notify
     public DateTime? CompletedAt { get => _completedAt; set => Set(ref _completedAt, value); }
     public ObservableCollection<TaskStep> Steps { get; set; } = new();
     public List<string> Labels { get; set; } = new();
-    /// <summary>"app", or "muse" when Meta's Muse AI added it through the connector.</summary>
+    /// <summary>"app" when you added it, otherwise the AI that did: "claude", "chatgpt", "gemini", "grok", "muse", "siri", "alexa" or "ai".</summary>
     public string Source { get; set; } = "app";
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
@@ -105,7 +105,9 @@ public sealed class TaskItem : Notify
     [JsonIgnore] public bool ShowMyDay { get => _showMyDay; set { if (Set(ref _showMyDay, value)) Raise(nameof(MyDayTag)); } }
     [JsonIgnore] public bool MyDayTag => _showMyDay && InMyDay;
 
-    [JsonIgnore] public bool FromMuse => string.Equals(Source, "muse", StringComparison.OrdinalIgnoreCase);
+    /// <summary>Added by an AI assistant through the connector.</summary>
+    [JsonIgnore] public bool FromAi => !string.IsNullOrEmpty(Source) && !string.Equals(Source, "app", StringComparison.OrdinalIgnoreCase);
+    [JsonIgnore] public string AddedByName => FromAi ? AiNames.Name(Source) : "";
     [JsonIgnore] public bool InMyDay => _myDay.HasValue && _myDay.Value.Date == DateTime.Today;
     [JsonIgnore] public bool HasDue => _due.HasValue;
     [JsonIgnore] public bool HasDueTime => _due.HasValue && _dueTime.HasValue;
@@ -173,7 +175,7 @@ public sealed class TaskItem : Notify
         get
         {
             var local = CreatedAt.ToLocalTime();
-            var by = FromMuse ? " by Muse" : "";
+            var by = FromAi ? " by " + AiNames.Name(Source) : "";
             return local.Date == DateTime.Today ? $"Created{by} today" : $"Created{by} {Dates.Friendly(local)}";
         }
     }
@@ -230,6 +232,44 @@ public sealed class TaskList : Notify
     [JsonIgnore] public string Glyph => ListIcons.Glyph(_icon);
 
     public void Touch() => UpdatedAt = DateTime.UtcNow;
+}
+
+/// <summary>The AI assistants Taskflare knows by name.</summary>
+public static class AiNames
+{
+    public static readonly (string Id, string Name)[] All =
+    {
+        ("claude", "Claude"), ("chatgpt", "ChatGPT"), ("gemini", "Gemini"), ("grok", "Grok"), ("muse", "Muse"),
+        ("siri", "Siri"), ("alexa", "Alexa"), ("copilot", "Copilot"), ("perplexity", "Perplexity"), ("lechat", "Le Chat"), ("ai", "AI"),
+    };
+
+    public static string Name(string id) =>
+        All.FirstOrDefault(a => string.Equals(a.Id, id, StringComparison.OrdinalIgnoreCase)).Name ?? "AI";
+
+    /// <summary>A known id, or "ai".</summary>
+    public static string Normalize(string id)
+    {
+        if (string.IsNullOrWhiteSpace(id)) return "ai";
+        id = id.Trim().ToLowerInvariant();
+        return All.Any(a => a.Id == id) ? id : Guess(id);
+    }
+
+    /// <summary>Works out the assistant from an MCP client name such as "claude-ai" or "openai-mcp".</summary>
+    public static string Guess(string clientName)
+    {
+        var n = (clientName ?? "").ToLowerInvariant();
+        if (n.Contains("claude") || n.Contains("anthropic")) return "claude";
+        if (n.Contains("openai") || n.Contains("chatgpt")) return "chatgpt";
+        if (n.Contains("gemini") || n.Contains("google")) return "gemini";
+        if (n.Contains("grok") || n.Contains("xai")) return "grok";
+        if (n.Contains("muse") || n.Contains("meta")) return "muse";
+        if (n.Contains("alexa") || n.Contains("amazon")) return "alexa";
+        if (n.Contains("copilot") || n.Contains("microsoft")) return "copilot";
+        if (n.Contains("perplexity")) return "perplexity";
+        if (n.Contains("mistral") || n.Contains("lechat")) return "lechat";
+        if (n.Contains("siri") || n.Contains("shortcut")) return "siri";
+        return "ai";
+    }
 }
 
 public static class ListIcons
