@@ -1,0 +1,17 @@
+Taskflare 1.1.1 self-test, 2026-11-12 02:49:24Z
+PASS Quick add: tomorrow 5pm #list p1 (15 ms)
+PASS Quick add: weekday and !! (2 ms)
+PASS Quick add: month day and time (0 ms)
+PASS Quick add: every monday (1 ms)
+PASS Quick add: tonight, star, label, in N days, list with spaces (1 ms)
+PASS Quick add: leaves ordinary text alone (0 ms)
+PASS API date and time words (2 ms)
+PASS Store: add, repeat, delete, save and reload (94 ms)
+PASS AI connector: MCP over HTTP (260 ms)
+PASS AI connector: REST API, Siri and key check (68 ms)
+PASS Checkoff sounds are valid WAV files (10 ms)
+PASS UI: views, detail pane and adding in Light mode (4655 ms)
+PASS UI: Dark mode and Settings (3775 ms)
+PASS Pop-ups use the normal font (date picker, suggestions) (2577 ms)
+PASS Reminder pops up (373 ms)
+ALL PASSED
