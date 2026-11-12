@@ -385,7 +385,7 @@ public static class MuseServer
         }
         var (result, error) = await RunTool(tool, args, source);
         if (error != null) await Json(ctx, error.StartsWith("No task", StringComparison.Ordinal) ? 404 : 400, new JsonObject { ["error"] = error });
-        else await Json(ctx, method == "POST" && tool.StartsWith("add", StringComparison.Ordinal) ? 201 : 200, result);
+        else await Json(ctx, method == "POST" && (tool.StartsWith("add", StringComparison.Ordinal) || tool == "quick_add") ? 201 : 200, result);
     }
 
     private static async Task<(JsonNode, string)> RunGet(string id)
